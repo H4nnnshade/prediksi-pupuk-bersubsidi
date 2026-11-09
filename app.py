@@ -155,13 +155,18 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 # ══════════════════════════════════════════════════════════
 plt.rcParams.update({
     'figure.facecolor': '#202734', 'axes.facecolor': '#252E3D',
-    'axes.edgecolor': 'none', 'axes.labelcolor': 'rgba(183,216,148,0.5)',
-    'axes.titlecolor': '#E0F8C7', 'axes.titlesize': 11, 'axes.titleweight': '600',
-    'axes.labelsize': 9, 'xtick.color': 'rgba(183,216,148,0.4)',
-    'ytick.color': 'rgba(183,216,148,0.4)', 'xtick.labelsize': 8, 'ytick.labelsize': 8,
+    'axes.edgecolor': 'none',
+    'axes.labelcolor': (0.718, 0.847, 0.580, 0.5),   # #B7D894 @ 50%
+    'axes.titlecolor': '#E0F8C7',
+    'axes.titlesize': 11, 'axes.titleweight': '600', 'axes.labelsize': 9,
+    'xtick.color': (0.718, 0.847, 0.580, 0.4),        # #B7D894 @ 40%
+    'ytick.color': (0.718, 0.847, 0.580, 0.4),
+    'xtick.labelsize': 8, 'ytick.labelsize': 8,
     'grid.color': '#2A3344', 'grid.linewidth': 0.8,
-    'legend.facecolor': '#252E3D', 'legend.edgecolor': 'rgba(183,216,148,0.1)',
-    'legend.fontsize': 8, 'text.color': '#B7D894', 'font.family': 'DejaVu Sans',
+    'legend.facecolor': '#252E3D',
+    'legend.edgecolor': (0.718, 0.847, 0.580, 0.1),   # #B7D894 @ 10%
+    'legend.fontsize': 8,
+    'text.color': '#B7D894', 'font.family': 'DejaVu Sans',
 })
 
 CG = '#B7D894'; CG2 = '#E0F8C7'; CB = '#36415A'; CG3 = '#7A9B6E'
