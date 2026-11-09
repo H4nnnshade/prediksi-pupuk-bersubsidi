@@ -184,8 +184,20 @@ PKL_FILES = {
 
 @st.cache_resource
 def load_models():
-    base = os.path.dirname(os.path.abspath(__file__))
-    models = {}; missing = []
+    # Coba beberapa lokasi — Streamlit Cloud mount repo di /mount/src/<repo>
+    candidates = [
+        os.path.dirname(os.path.abspath(__file__)),  # direktori app.py
+        os.getcwd(),                                   # working directory
+        '/mount/src/' + os.getcwd().split('/')[-1],   # Streamlit Cloud mount
+    ]
+    # Pakai direktori pertama yang berisi salah satu pkl
+    base = candidates[0]
+    for cand in candidates:
+        if os.path.exists(os.path.join(cand, 'model_rf_pupuk.pkl')):
+            base = cand
+            break
+
+    models = {'_base': base}; missing = []
     for key, fname in PKL_FILES.items():
         path = os.path.join(base, fname)
         if os.path.exists(path):
@@ -252,6 +264,18 @@ if not models_ok:
         <span>File pkl tidak ditemukan: <strong style="color:#f08080;">{', '.join(M['missing'])}</strong></span>
     </div>
     """, unsafe_allow_html=True)
+
+    # DEBUG — hapus setelah pkl berhasil load
+    with st.expander("🔍 Debug Info (hapus setelah fix)"):
+        st.code(f"""
+Base dir   : {M.get('_base', 'unknown')}
+CWD        : {os.getcwd()}
+__file__   : {os.path.abspath(__file__)}
+
+Files di base dir:
+{chr(10).join(sorted(os.listdir(M.get('_base', '.')))[:30])}
+        """)
+
 
     c1, c2 = st.columns(2)
     with c1:
