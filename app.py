@@ -207,9 +207,10 @@ def load_models():
             try:
                 models[key] = joblib.load(path)
             except Exception as e:
-                missing.append(f"{fname} (load error: {str(e)[:30]})")
+                err_msg = str(e) if str(e) else type(e).__name__
+                missing.append(f"{fname} (exists but load failed: {err_msg[:50]})")
         else:
-            missing.append(fname)
+            missing.append(f"{fname} (file not found at {path})")
 
     feat_path = os.path.join(base, 'feature_names.json')
     if os.path.exists(feat_path):
