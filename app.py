@@ -189,30 +189,35 @@ PKL_FILES = {
 
 @st.cache_resource
 def load_models():
-    candidates = [
-        os.path.dirname(os.path.abspath(__file__)),
-        os.getcwd(),
-        '/mount/src/' + os.path.basename(os.path.getcwd()),
-    ]
-    base = candidates[0]
-    for cand in candidates:
-        if os.path.exists(os.path.join(cand, 'model_rf_pupuk.pkl')):
-            base = cand
-            break
+    # Try multiple paths — Streamlit Cloud mounts at /mount/src/REPO
+    base = os.path.dirname(os.path.abspath(__file__))
+    
+    # If __file__ not in mounted repo, try /mount/src
+    if not os.path.exists(os.path.join(base, 'model_rf_pupuk.pkl')):
+        if os.path.exists('/mount/src'):
+            base = '/mount/src'
+        else:
+            base = os.getcwd()
 
     models = {'_base': base}
     missing = []
     for key, fname in PKL_FILES.items():
         path = os.path.join(base, fname)
         if os.path.exists(path):
-            models[key] = joblib.load(path)
+            try:
+                models[key] = joblib.load(path)
+            except Exception as e:
+                missing.append(f"{fname} (load error: {str(e)[:30]})")
         else:
             missing.append(fname)
 
     feat_path = os.path.join(base, 'feature_names.json')
     if os.path.exists(feat_path):
-        with open(feat_path) as f:
-            models['features'] = json.load(f)
+        try:
+            with open(feat_path) as f:
+                models['features'] = json.load(f)
+        except:
+            models['features'] = ['Jenis Pupuk Enc','Kecamatan Enc','Bulan','Tahun','RDKK (ton)','Alokasi (ton)']
     else:
         models['features'] = ['Jenis Pupuk Enc','Kecamatan Enc','Bulan','Tahun','RDKK (ton)','Alokasi (ton)']
 
