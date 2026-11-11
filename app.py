@@ -19,312 +19,25 @@ from dashboard_logic import filter_dataset
 warnings.filterwarnings("ignore")
 
 st.set_page_config(
-    page_title="Arus Pupuk",
+    page_title="Pupuk Lobar",
     page_icon="🌾",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Arc-inspired visual language, adapted to native Streamlit controls.
-st.markdown(
-    """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
-:root {
-  --canvas: #EDF2F0;
-  --surface: #FBFCFA;
-  --surface-raised: #FFFFFF;
-  --surface-muted: #E5ECE9;
-  --ink: #1B2929;
-  --secondary: #596A67;
-  --muted: #788783;
-  --line: #DCE5E1;
-  --teal: #28766D;
-  --teal-deep: #1F5E57;
-  --citron: #D7EA8B;
-  --amber: #D58B5B;
-  --danger: #B5534B;
-  --radius-control: 16px;
-  --radius-panel: 26px;
-  --radius-hero: 34px;
-}
+# Purpose-built field-office design system: agricultural green, aligned measures,
+# restrained corners and plain, readable data surfaces.
+DASHBOARD_CSS = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
+st.markdown(f"<style>{DASHBOARD_CSS}</style>", unsafe_allow_html=True)
 
-*, *::before, *::after { box-sizing: border-box; }
-html, body, .stApp,
-[data-testid="stAppViewContainer"], [data-testid="stMain"] {
-  background: var(--canvas);
-  color: var(--ink);
-  font-family: 'Inter', sans-serif;
-}
-.block-container {
-  max-width: 1540px !important;
-  padding: 34px 42px 72px !important;
-}
-
-h1, h2, h3, h4 {
-  color: var(--ink);
-  font-family: 'Geist', 'Inter', sans-serif;
-  letter-spacing: -0.035em;
-  font-weight: 600;
-}
-h1 { font-size: clamp(2rem, 3.2vw, 3.15rem); line-height: 1.08; }
-h2 { font-size: clamp(1.55rem, 2.2vw, 2.15rem); line-height: 1.18; }
-h3 { font-size: 1.22rem; line-height: 1.3; }
-p, [data-testid="stMarkdownContainer"] { color: var(--secondary); }
-small, .stCaption { color: var(--muted) !important; }
-
-/* Sidebar acts as a quiet control rail rather than a second dashboard. */
-[data-testid="stSidebar"] {
-  background: #E7EEEB !important;
-  border-right: 1px solid var(--line);
-}
-[data-testid="stSidebar"] > div { padding: 28px 20px 32px; }
-[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { color: var(--ink); }
-[data-testid="stSidebar"] .stFileUploader section {
-  background: rgba(255,255,255,.62);
-  border: 1px dashed #B8C9C2;
-  border-radius: var(--radius-panel);
-  padding: 14px;
-}
-
-/* A selected tab sits inside a soft segmented control. */
-.stTabs [data-baseweb="tab-list"] {
-  display: inline-flex;
-  width: auto;
-  max-width: 100%;
-  gap: 4px;
-  padding: 5px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: #E4EBE8;
-}
-.stTabs [data-baseweb="tab"] {
-  min-height: 42px;
-  padding: 0 18px;
-  border: 0 !important;
-  border-radius: 15px;
-  background: transparent !important;
-  color: var(--secondary) !important;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background-color .16s ease, color .16s ease;
-}
-.stTabs [data-baseweb="tab"]:hover { color: var(--ink) !important; }
-.stTabs [aria-selected="true"] {
-  background: var(--surface-raised) !important;
-  color: var(--ink) !important;
-  box-shadow: 0 2px 8px rgba(31, 54, 49, .08);
-}
-.stTabs [data-baseweb="tab-highlight"] { display: none; }
-.stTabs [data-baseweb="tab-border"] { display: none; }
-.stTabs [data-baseweb="tab-panel"] { padding-top: 28px; }
-
-/* Streamlit containers become Arc-like layered surfaces, not uniform tiles. */
-[data-testid="stVerticalBlockBorderWrapper"] {
-  background: var(--surface);
-  border: 1px solid var(--line) !important;
-  border-radius: var(--radius-panel) !important;
-  box-shadow: 0 5px 18px rgba(41, 69, 62, .035);
-}
-[data-testid="stMetric"] {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  padding: 18px 20px;
-}
-[data-testid="stMetricLabel"] p {
-  color: var(--muted) !important;
-  font-size: 12px;
-  font-weight: 500;
-}
-[data-testid="stMetricValue"] {
-  color: var(--ink);
-  font-family: 'Geist', 'Inter', sans-serif;
-  font-size: clamp(1.45rem, 2vw, 2rem);
-  font-weight: 600;
-  letter-spacing: -.04em;
-}
-[data-testid="stMetricDelta"] { font-size: 12px; }
-
-/* Inputs, menus, buttons */
-.stTextInput input, .stNumberInput input, .stSelectbox [data-baseweb="select"] > div,
-.stDateInput input, .stMultiSelect [data-baseweb="select"] > div {
-  background: var(--surface-raised) !important;
-  border: 1px solid #CFDAD5 !important;
-  border-radius: var(--radius-control) !important;
-  color: var(--ink) !important;
-  min-height: 44px;
-}
-.stTextInput input:focus, .stNumberInput input:focus,
-.stDateInput input:focus {
-  border-color: var(--teal) !important;
-  box-shadow: 0 0 0 3px rgba(40, 118, 109, .15) !important;
-}
-.stButton > button, [data-testid="stDownloadButton"] > button {
-  min-height: 42px;
-  border: 1px solid #CFDAD5 !important;
-  border-radius: var(--radius-control) !important;
-  background: var(--surface-raised) !important;
-  color: var(--ink) !important;
-  font-weight: 500 !important;
-  transition: background-color .16s ease, border-color .16s ease;
-}
-.stButton > button:hover, [data-testid="stDownloadButton"] > button:hover {
-  border-color: var(--teal) !important;
-  background: #F4F8F5 !important;
-}
-[data-testid="stFormSubmitButton"] > button {
-  min-height: 48px;
-  border: 0 !important;
-  border-radius: 17px !important;
-  background: var(--teal) !important;
-  color: white !important;
-  font-weight: 600 !important;
-}
-[data-testid="stFormSubmitButton"] > button:hover { background: var(--teal-deep) !important; }
-button:focus-visible, a:focus-visible, input:focus-visible, [role="tab"]:focus-visible {
-  outline: 3px solid rgba(40,118,109,.48) !important;
-  outline-offset: 2px !important;
-}
-
-[data-testid="stDataFrame"] {
-  background: var(--surface) !important;
-  color-scheme: light !important;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  overflow: hidden;
-}
-[data-testid="stDataFrame"] iframe { color-scheme: light !important; }
-[data-testid="stDataFrame"] canvas { background: var(--surface) !important; }
-[data-testid="stDataFrame"] [data-testid="stElementToolbar"] { background:#FFFFFF !important; }
-[data-testid="stDataFrame"] [role="grid"] { background:#FFFFFF !important; }
-[data-testid="stDataFrame"] [role="columnheader"] { background:#EAF0E9 !important; color:#24342E !important; }
-[data-testid="stDataFrame"] [role="gridcell"] { background:#FFFFFF !important; color:#24342E !important; }
-[data-testid="stDataFrame"] [role="row"]:nth-child(even) [role="gridcell"] { background:#F6F9F5 !important; }
-@media (prefers-color-scheme: dark) {
-  [data-testid="stDataFrame"], [data-testid="stDataFrame"] iframe,
-  [data-testid="stDataFrame"] canvas { color-scheme: light !important; background:#FFFFFF !important; }
-}
-[data-testid="stSidebar"] > div { overflow-x:hidden; }
-[data-testid="stMainBlockContainer"] { min-width:0; }
-[data-testid="stHorizontalBlock"] { flex-wrap:wrap; }
-.stTabs [data-baseweb="tab-list"] { max-width:100%; overflow-x:auto; scrollbar-width:thin; }
-@media (max-width: 760px) {
-  .block-container { padding:18px 14px 38px !important; }
-  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width:calc(50% - 8px) !important; }
-  .page-head { align-items:flex-start; }
-  .model-pill { white-space:normal; }
-  .flow-panel { padding:22px 20px; gap:14px; }
-  .stTabs [data-baseweb="tab-panel"] { padding-top:18px; }
-}
-@media (max-width: 520px) {
-  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width:100% !important; }
-  .flow-graphic { display:grid; grid-template-columns:minmax(0,1fr); width:100%; gap:6px; padding:8px 0 0; }
-  .flow-node { width:100%; height:auto; min-height:58px; padding:10px 14px; border-radius:16px; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; }
-  .flow-node strong { flex:0 0 auto; font-size:14px; }
-  .flow-node span { margin:0; text-align:right; }
-  .flow-link { width:2px; height:10px; justify-self:center; }
-  .flow-link:after { right:-3px; top:3px; transform:rotate(135deg); }
-  .flow-panel { padding:20px 17px; border-radius:20px; }
-  .page-title { font-size:30px; }
-  .stTabs [data-baseweb="tab"] { min-height:40px; padding:0 12px; font-size:12px; }
-  [data-testid="stMetric"] { padding:14px !important; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
-}
-[data-testid="stAlert"] {
-  border-radius: 18px;
-  border: 1px solid var(--line);
-}
-[data-testid="stExpander"] {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: rgba(255,255,255,.52);
-}
-hr { border-color: var(--line) !important; }
-
-/* Header and signature distribution-flow panel. */
-.brand-row { display:flex; align-items:center; gap:12px; margin-bottom:28px; }
-.brand-symbol {
-  display:grid; place-items:center; width:40px; height:40px;
-  border-radius:15px; background:var(--teal); color:white; font-size:19px;
-}
-.brand-name { font:600 16px 'Geist','Inter',sans-serif; color:var(--ink); letter-spacing:-.02em; }
-.brand-sub { margin-top:2px; font-size:11px; color:var(--muted); }
-.page-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin: 4px 0 26px; }
-.page-title { font:600 clamp(28px,3vw,42px)/1.08 'Geist','Inter',sans-serif; letter-spacing:-.045em; color:var(--ink); max-width:780px; }
-.page-note { margin-top:10px; max-width:650px; font-size:14px; line-height:1.65; color:var(--secondary); }
-.model-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.56); color:var(--secondary); font-size:12px; white-space:nowrap; }
-.pill-dot { width:8px; height:8px; border-radius:50%; background:var(--amber); }
-.pill-dot.ready { background:var(--teal); box-shadow:0 0 0 4px rgba(40,118,109,.12); }
-.flow-panel {
-  position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);
-  gap:28px; align-items:center; min-height:230px; padding:32px 34px;
-  border:1px solid #D2DFD9; border-radius:var(--radius-hero);
-  background:linear-gradient(115deg,#F9FBF8 0%,#F2F7F4 58%,#E9F1ED 100%);
-}
-.flow-copy { position:relative; z-index:1; }
-.flow-copy h2 { margin:0 0 10px; max-width:570px; }
-.flow-copy p { margin:0; max-width:570px; font-size:14px; line-height:1.7; }
-.flow-graphic { display:flex; align-items:center; justify-content:center; gap:8px; padding:16px; }
-.flow-node {
-  display:flex; flex-direction:column; justify-content:center; width:106px; height:106px; padding:13px;
-  border:1px solid rgba(74,112,101,.16); border-radius:30px; background:rgba(255,255,255,.78);
-  box-shadow:0 8px 24px rgba(50,80,70,.06);
-}
-.flow-node strong { font:600 17px 'Geist','Inter',sans-serif; color:var(--ink); letter-spacing:-.03em; }
-.flow-node span { margin-top:6px; color:var(--muted); font-size:10px; line-height:1.3; }
-.flow-node.active { background:var(--teal); border-color:var(--teal); transform:translateY(-8px); }
-.flow-node.active strong, .flow-node.active span { color:white; }
-.flow-link { width:20px; height:2px; background:#A9BCB4; position:relative; }
-.flow-link:after { content:''; position:absolute; right:-1px; top:-3px; width:7px; height:7px; border-top:2px solid #A9BCB4; border-right:2px solid #A9BCB4; transform:rotate(45deg); }
-.section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:8px 0 16px; }
-.section-heading h3 { margin:0; }
-.section-heading span { color:var(--muted); font-size:12px; }
-.panel-title { margin:0 0 8px; font:600 16px 'Geist','Inter',sans-serif; color:var(--ink); }
-.panel-hint { margin:0 0 18px; font-size:12px; line-height:1.5; color:var(--muted); }
-.empty-panel { display:flex; flex-direction:column; justify-content:center; min-height:235px; padding:24px; border:1px dashed #B8C9C2; border-radius:24px; background:rgba(255,255,255,.48); }
-.empty-panel strong { margin-bottom:8px; font:600 17px 'Geist','Inter',sans-serif; color:var(--ink); }
-.empty-panel span { max-width:440px; font-size:13px; line-height:1.65; color:var(--secondary); }
-.result-panel { padding:24px; border-radius:26px; background:#E5F0EC; border:1px solid #C8DDD5; }
-.result-number { font:600 clamp(32px,4vw,48px)/1 'Geist','Inter',sans-serif; color:var(--teal-deep); letter-spacing:-.05em; }
-.result-caption { margin-top:8px; color:var(--secondary); font-size:12px; }
-.status-note { padding:14px 16px; border-radius:16px; background:#F2F5E8; color:#52633C; font-size:13px; line-height:1.55; }
-
-#MainMenu, footer, [data-testid="stDecoration"] { visibility:hidden; }
-@media (max-width: 900px) {
-  .block-container { padding:24px 22px 52px !important; }
-  .flow-panel { grid-template-columns:1fr; }
-  .flow-graphic { justify-content:flex-start; padding:10px 0 0; }
-}
-@media (max-width: 600px) {
-  .block-container { padding:18px 14px 40px !important; }
-  .page-head { flex-direction:column; }
-  .flow-panel { padding:24px 20px; border-radius:26px; }
-  .flow-graphic { gap:5px; }
-  .flow-node { width:82px; height:88px; padding:10px; border-radius:23px; }
-  .flow-node strong { font-size:14px; }
-  .flow-link { width:12px; }
-  .stTabs [data-baseweb="tab-list"] { width:100%; overflow-x:auto; }
-  .stTabs [data-baseweb="tab"] { padding:0 13px; font-size:12px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
-}
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-# Chart palette follows semantic dashboard tokens.
-INK = "#1B2929"
-TEAL = "#28766D"
-CITRON = "#B8D85D"
-AMBER = "#D58B5B"
-MUTED = "#788783"
-LINE = "#DCE5E1"
-SURFACE = "#FBFCFA"
+# Chart palette follows field-office dashboard tokens.
+INK = "#203329"
+TEAL = "#3B704F"
+CITRON = "#D7AA4C"
+AMBER = "#A45D46"
+MUTED = "#77847A"
+LINE = "#D5DDD3"
+SURFACE = "#FFFFFF"
 
 plt.rcParams.update({
     "figure.facecolor": SURFACE,
@@ -465,25 +178,22 @@ def show_chart(fig) -> None:
     plt.close(fig)
 
 
-def make_flow_panel(model_ready: bool) -> None:
-    status_line = (
-        "Model siap menerima input distribusi. Pilih jenis pupuk, kecamatan, periode, dan volume alokasi."
-        if model_ready else
-        "Panel prediksi aktif setelah semua model dan encoder tersedia di root repo GitHub."
-    )
+def make_hero_panel(model_ready: bool) -> None:
+    readiness = "Model prediksi tersedia" if model_ready else "Ringkasan tetap tersedia · model prediksi belum lengkap"
+    status_class = "ready" if model_ready else ""
     st.markdown(
         f"""
-        <section class="flow-panel">
-          <div class="flow-copy">
-            <h2>RDKK masuk. Alokasi bergerak. Realisasi terbaca.</h2>
-            <p>{status_line}</p>
+        <section class="hero-band">
+          <div class="hero-copy">
+            <div class="hero-eyebrow">DISTRIBUSI PUPUK BERSUBSIDI · LOMBOK BARAT</div>
+            <h1 class="hero-title">Kebutuhan hingga realisasi, satu laporan yang terbaca.</h1>
+            <p class="hero-description">Pantau alokasi dan penyaluran pupuk per kecamatan, jenis, dan tahun. Semua angka mengikuti dataset dan filter aktif.</p>
+            <div class="hero-status"><span class="status-dot {status_class}"></span>{readiness}</div>
           </div>
-          <div class="flow-graphic" aria-label="Alur distribusi pupuk">
-            <div class="flow-node"><strong>RDKK</strong><span>kebutuhan<br>kelompok tani</span></div>
-            <div class="flow-link"></div>
-            <div class="flow-node"><strong>Alokasi</strong><span>pupuk tersedia<br>untuk wilayah</span></div>
-            <div class="flow-link"></div>
-            <div class="flow-node active"><strong>Realisasi</strong><span>volume yang<br>diperkirakan</span></div>
+          <div class="hero-route" aria-label="Alur distribusi pupuk">
+            <div class="route-step"><span class="route-name">Kebutuhan</span><span class="route-description">RDKK kelompok tani</span></div>
+            <div class="route-step"><span class="route-name">Alokasi</span><span class="route-description">Pupuk per wilayah</span></div>
+            <div class="route-step"><span class="route-name">Realisasi</span><span class="route-description">Penyaluran tercatat</span></div>
           </div>
         </section>
         """,
@@ -568,8 +278,8 @@ with st.sidebar:
     st.markdown(
         """
         <div class="brand-row">
-          <div class="brand-symbol">⌁</div>
-          <div><div class="brand-name">Arus Pupuk</div><div class="brand-sub">Distribusi bersubsidi · Lombok Barat</div></div>
+          <div class="brand-symbol"><i></i><i></i><i></i><i></i></div>
+          <div><div class="brand-name">Pupuk Lobar</div><div class="brand-sub">Distribusi bersubsidi · Lombok Barat</div></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -673,50 +383,39 @@ if frame is not None and not frame.empty:
 
 view_frame = filtered_frame if filtered_frame is not None else frame
 
-st.markdown(
-    f"""
-    <header class="page-head">
-      <div>
-        <div class="page-title">Distribusi pupuk, terbaca jelas.</div>
-        <div class="page-note">Pantau realisasi historis dan estimasi penyaluran per jenis pupuk serta kecamatan.</div>
-      </div>
-      <div class="model-pill"><span class="pill-dot {"ready" if model_ready else ""}"></span>{"Model siap" if model_ready else "Model belum lengkap"}</div>
-    </header>
-    """,
-    unsafe_allow_html=True,
-)
-make_flow_panel(model_ready)
+make_hero_panel(model_ready)
 
 # Real values appear only when the user supplies the workbook. No placeholder metrics.
-row = st.columns(4)
-if view_frame is not None and not view_frame.empty:
-    total_realization = view_frame["Realisasi (ton)"].sum()
-    total_allocation = view_frame["Alokasi (ton)"].sum()
-    absorption = (total_realization / total_allocation * 100) if total_allocation else np.nan
-    latest_year = int(view_frame["Tahun"].max())
-    summary_values = [
-        ("Realisasi tercatat", f"{ton(total_realization)} ton", "sesuai filter aktif"),
-        ("Alokasi tercatat", f"{ton(total_allocation)} ton", "sesuai filter aktif"),
-        ("Serapan", f"{ton(absorption)}%" if np.isfinite(absorption) else "—", "realisasi ÷ alokasi"),
-        ("Wilayah / jenis", f"{view_frame['Kecamatan'].nunique()} / {view_frame['Jenis Pupuk'].nunique()}", f"hingga {latest_year}"),
-    ]
-elif view_frame is not None:
-    summary_values = [
-        ("Realisasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
-        ("Alokasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
-        ("Serapan", "—", "tidak ada alokasi untuk dihitung"),
-        ("Wilayah / jenis", "0 / 0", "tidak ada baris sesuai filter"),
-    ]
-else:
-    summary_values = [
-        ("Realisasi tercatat", "—", "unggah dataset untuk dihitung"),
-        ("Alokasi tercatat", "—", "unggah dataset untuk dihitung"),
-        ("Serapan", "—", "realisasi dibanding alokasi"),
-        ("Wilayah / jenis", "—", "dihitung dari dataset"),
-    ]
-for cell, (label, value, note) in zip(row, summary_values):
-    with cell:
-        st.metric(label, value, help=note)
+with st.container(key="summary_metrics"):
+    row = st.columns(4)
+    if view_frame is not None and not view_frame.empty:
+        total_realization = view_frame["Realisasi (ton)"].sum()
+        total_allocation = view_frame["Alokasi (ton)"].sum()
+        absorption = (total_realization / total_allocation * 100) if total_allocation else np.nan
+        latest_year = int(view_frame["Tahun"].max())
+        summary_values = [
+            ("Realisasi tercatat", f"{ton(total_realization)} ton", "sesuai filter aktif"),
+            ("Alokasi tercatat", f"{ton(total_allocation)} ton", "sesuai filter aktif"),
+            ("Serapan", f"{ton(absorption)}%" if np.isfinite(absorption) else "—", "realisasi ÷ alokasi"),
+            ("Wilayah / jenis", f"{view_frame['Kecamatan'].nunique()} / {view_frame['Jenis Pupuk'].nunique()}", f"hingga {latest_year}"),
+        ]
+    elif view_frame is not None:
+        summary_values = [
+            ("Realisasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
+            ("Alokasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
+            ("Serapan", "—", "tidak ada alokasi untuk dihitung"),
+            ("Wilayah / jenis", "0 / 0", "tidak ada baris sesuai filter"),
+        ]
+    else:
+        summary_values = [
+            ("Realisasi tercatat", "—", "unggah dataset untuk dihitung"),
+            ("Alokasi tercatat", "—", "unggah dataset untuk dihitung"),
+            ("Serapan", "—", "realisasi dibanding alokasi"),
+            ("Wilayah / jenis", "—", "dihitung dari dataset"),
+        ]
+    for cell, (label, value, note) in zip(row, summary_values):
+        with cell:
+            st.metric(label, value, help=note)
 
 st.write("")
 overview_tab, predict_tab, data_tab, model_tab = st.tabs(["Ringkasan", "Prediksi", "Dataset", "Model"])
@@ -900,4 +599,4 @@ with model_tab:
                 st.code(f"{key}: {path}", language=None)
 
 st.write("")
-st.caption("Arus Pupuk · Estimasi berbasis Random Forest dan XGBoost")
+st.caption("Pupuk Lobar · Estimasi berbasis Random Forest dan XGBoost")
