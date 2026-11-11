@@ -10,39 +10,48 @@ def dashboard_css() -> str:
     return CSS_PATH.read_text(encoding="utf-8")
 
 
-def test_dashboard_uses_new_hero_and_external_visual_system():
+def test_page_uses_live_coverage_masthead_instead_of_previous_hero():
     source = APP_PATH.read_text(encoding="utf-8")
-
-    assert 'with st.container(key="summary_metrics")' in source
-    assert 'make_hero_panel(model_ready)' in source
-    assert "dashboard.css" in source
-    assert "make_flow_panel" not in source
-    assert "Arc-inspired" not in source
-
-
-def test_dashboard_visual_system_uses_equal_metric_tracks_and_compact_card_geometry():
     css = dashboard_css()
+
+    assert "make_report_header(model_ready, view_frame)" in source
+    assert "def make_report_header(" in source
+    assert ".report-heading" in css
+    assert ".hero-band" not in css
+    assert "make_hero_panel" not in source
+    assert "Unggah workbook untuk ringkasan" in source
+
+
+def test_summary_metrics_form_one_aligned_measurement_strip():
+    css = dashboard_css().replace(" ", "")
 
     assert "grid-template-columns:repeat(4,minmax(0,1fr))" in css
-    assert "grid-template-columns:repeat(2,minmax(0,1fr))" in css
-    assert "--field-radius:12px" in css
-    assert "min-height:142px" in css
+    assert "background:transparent!important" in css
+    assert "border-radius:0!important" in css
+    assert "box-shadow:none!important" in css
+    assert "--field-ground:#EFF4F1" in css
+    assert "--field-dark:#153E38" in css
+    assert "--field-leaf:#C7D86B" in css
 
 
-def test_dashboard_visual_system_has_explicit_small_screen_and_light_table_rules():
+def test_identity_is_field_station_not_previous_arc_like_hero():
     css = dashboard_css()
 
-    assert "@media(max-width:600px)" in css
-    assert "@media(max-width:370px)" in css
-    assert "color-scheme:light!important" in css
+    assert ".report-heading" in css
+    assert ".hero-band" not in css
+    assert "repeating-linear-gradient" not in css
+    assert "linear-gradient" not in css
+    assert "Barlow Condensed" in css
+    assert "[data-testid=\"stSidebar\"]{background:var(--field-dark)!important" in css
+
+
+def test_report_layout_and_controls_cover_narrow_screen_and_accessibility():
+    css = dashboard_css().replace(" ", "")
+
+    assert "@media(max-width:900px)" in css
+    assert "@media(max-width:720px)" in css
+    assert "@media(max-width:390px)" in css
     assert "prefers-reduced-motion:reduce" in css
-
-
-def test_dashboard_brand_and_surface_do_not_reuse_arc_visual_language():
-    css = dashboard_css()
-
-    assert "hero-band" in css
-    assert "repeating-linear-gradient" in css
-    assert "--field-green-deep:#214735" in css
-    assert "Arc-inspired" not in css
-    assert "--radius-hero" not in css
+    assert "focus-visible" in css
+    assert "color-scheme:light!important" in css
+    assert "[data-testid=\"stDeployButton\"]{display:none!important}" in css

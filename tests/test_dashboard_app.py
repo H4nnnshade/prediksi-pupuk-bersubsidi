@@ -35,6 +35,7 @@ def test_uploaded_workbook_exposes_live_filters_and_updates_metrics_table_and_cs
     app = load_app_with_sample_data()
 
     assert not app.exception
+    assert any("Ringkasan data aktif; file model belum lengkap" in item.value for item in app.markdown)
     assert len(app.slider) == 1
     assert len(app.multiselect) == 2
     assert app.metric[0].value == "300,0 ton"

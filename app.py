@@ -25,18 +25,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Purpose-built field-office design system: agricultural green, aligned measures,
-# restrained corners and plain, readable data surfaces.
+# Independent visual identity: agricultural field records, not a generic card dashboard.
 DASHBOARD_CSS = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
 st.markdown(f"<style>{DASHBOARD_CSS}</style>", unsafe_allow_html=True)
 
-# Chart palette follows field-office dashboard tokens.
-INK = "#203329"
-TEAL = "#3B704F"
-CITRON = "#D7AA4C"
-AMBER = "#A45D46"
-MUTED = "#77847A"
-LINE = "#D5DDD3"
+# Chart colors share the field-station system and preserve series contrast.
+INK = "#18332E"
+TEAL = "#216C5E"
+CITRON = "#C7D86B"
+AMBER = "#B75F49"
+MUTED = "#70827A"
+LINE = "#D3E0DA"
 SURFACE = "#FFFFFF"
 
 plt.rcParams.update({
@@ -178,24 +177,39 @@ def show_chart(fig) -> None:
     plt.close(fig)
 
 
-def make_hero_panel(model_ready: bool) -> None:
-    readiness = "Model prediksi tersedia" if model_ready else "Ringkasan tetap tersedia · model prediksi belum lengkap"
+def make_report_header(model_ready: bool, frame: pd.DataFrame | None) -> None:
+    if model_ready:
+        readiness = "Model prediksi siap"
+    elif frame is None:
+        readiness = "Unggah workbook untuk ringkasan; file model belum lengkap"
+    else:
+        readiness = "Ringkasan data aktif; file model belum lengkap"
     status_class = "ready" if model_ready else ""
+    if frame is None:
+        coverage = "Belum ada workbook"
+        coverage_note = "Unggah data untuk membuka ringkasan"
+    elif frame.empty:
+        coverage = "Tidak ada baris"
+        coverage_note = "Sesuaikan filter untuk melihat data"
+    else:
+        first_year, last_year = int(frame["Tahun"].min()), int(frame["Tahun"].max())
+        coverage = str(first_year) if first_year == last_year else f"{first_year}–{last_year}"
+        coverage_note = f"{len(frame):,} baris · {frame['Kecamatan'].nunique()} kecamatan"
     st.markdown(
         f"""
-        <section class="hero-band">
-          <div class="hero-copy">
-            <div class="hero-eyebrow">DISTRIBUSI PUPUK BERSUBSIDI · LOMBOK BARAT</div>
-            <h1 class="hero-title">Kebutuhan hingga realisasi, satu laporan yang terbaca.</h1>
-            <p class="hero-description">Pantau alokasi dan penyaluran pupuk per kecamatan, jenis, dan tahun. Semua angka mengikuti dataset dan filter aktif.</p>
-            <div class="hero-status"><span class="status-dot {status_class}"></span>{readiness}</div>
+        <header class="report-header">
+          <div class="report-copy">
+            <p class="report-kicker">LAPORAN DISTRIBUSI · LOMBOK BARAT</p>
+            <h1 class="report-heading">Pupuk, dari alokasi hingga penyaluran.</h1>
+            <p class="report-deck">Rekapitulasi data pupuk bersubsidi menurut kecamatan, jenis, dan tahun. Angka di bawah mengikuti pilihan filter dan workbook yang sedang aktif.</p>
+            <div class="report-status"><span class="report-status-dot {status_class}"></span>{readiness}</div>
           </div>
-          <div class="hero-route" aria-label="Alur distribusi pupuk">
-            <div class="route-step"><span class="route-name">Kebutuhan</span><span class="route-description">RDKK kelompok tani</span></div>
-            <div class="route-step"><span class="route-name">Alokasi</span><span class="route-description">Pupuk per wilayah</span></div>
-            <div class="route-step"><span class="route-name">Realisasi</span><span class="route-description">Penyaluran tercatat</span></div>
-          </div>
-        </section>
+          <aside class="report-aside" aria-label="Cakupan dataset">
+            <div class="report-aside-label">Cakupan data aktif</div>
+            <div class="report-aside-place">{coverage}</div>
+            <div class="report-aside-note">{coverage_note}</div>
+          </aside>
+        </header>
         """,
         unsafe_allow_html=True,
     )
@@ -383,7 +397,7 @@ if frame is not None and not frame.empty:
 
 view_frame = filtered_frame if filtered_frame is not None else frame
 
-make_hero_panel(model_ready)
+make_report_header(model_ready, view_frame)
 
 # Real values appear only when the user supplies the workbook. No placeholder metrics.
 with st.container(key="summary_metrics"):
