@@ -1,673 +1,748 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import joblib
+from __future__ import annotations
+
+import io
 import json
 import os
 import warnings
-warnings.filterwarnings('ignore')
+from pathlib import Path
 
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import streamlit as st
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+
+warnings.filterwarnings("ignore")
 
 st.set_page_config(
-    page_title="Pupuk Prediksi",
-    page_icon="🌱",
+    page_title="Arus Pupuk",
+    page_icon="🌾",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
-# ══════════════════════════════════════════════════════════
-# DESIGN — Based on Botanist & AgroFlow (proven ag dashboards)
-# Light theme, clean sans-serif, green agricultural standard
-# ══════════════════════════════════════════════════════════
-st.markdown("""
+# Arc-inspired visual language, adapted to native Streamlit controls.
+st.markdown(
+    """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-* { box-sizing: border-box; }
-
-html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"], .stApp {
-    background: #f8f9f7;
-    font-family: 'Inter', -apple-system, system-ui, sans-serif;
-    color: #1a1a1a;
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+:root {
+  --canvas: #EDF2F0;
+  --surface: #FBFCFA;
+  --surface-raised: #FFFFFF;
+  --surface-muted: #E5ECE9;
+  --ink: #1B2929;
+  --secondary: #596A67;
+  --muted: #788783;
+  --line: #DCE5E1;
+  --teal: #28766D;
+  --teal-deep: #1F5E57;
+  --citron: #D7EA8B;
+  --amber: #D58B5B;
+  --danger: #B5534B;
+  --radius-control: 16px;
+  --radius-panel: 26px;
+  --radius-hero: 34px;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
+html, body, .stApp,
+[data-testid="stAppViewContainer"], [data-testid="stMain"] {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: 'Inter', sans-serif;
+}
 .block-container {
-    padding: 32px 48px 48px !important;
-    max-width: 1600px !important;
+  max-width: 1540px !important;
+  padding: 34px 42px 72px !important;
 }
 
-/* Typography */
-h1, h2, h3, h4 { font-weight: 700; color: #1a1a1a; letter-spacing: -0.5px; }
-h1 { font-size: 40px; line-height: 1.2; margin-bottom: 12px; }
-h2 { font-size: 28px; line-height: 1.25; margin-bottom: 20px; margin-top: 0; }
-h3 { font-size: 18px; line-height: 1.35; margin-bottom: 16px; }
+h1, h2, h3, h4 {
+  color: var(--ink);
+  font-family: 'Geist', 'Inter', sans-serif;
+  letter-spacing: -0.035em;
+  font-weight: 600;
+}
+h1 { font-size: clamp(2rem, 3.2vw, 3.15rem); line-height: 1.08; }
+h2 { font-size: clamp(1.55rem, 2.2vw, 2.15rem); line-height: 1.18; }
+h3 { font-size: 1.22rem; line-height: 1.3; }
+p, [data-testid="stMarkdownContainer"] { color: var(--secondary); }
+small, .stCaption { color: var(--muted) !important; }
 
-p { line-height: 1.6; color: #555; }
-
-/* Sidebar */
+/* Sidebar acts as a quiet control rail rather than a second dashboard. */
 [data-testid="stSidebar"] {
-    background: #ffffff !important;
-    border-right: 1px solid #e5e5e3 !important;
+  background: #E7EEEB !important;
+  border-right: 1px solid var(--line);
 }
-[data-testid="stSidebar"] > div { padding: 28px 20px; }
-[data-testid="stSidebar"] .stFileUploader {
-    background: #f5f5f3;
-    border: 2px dashed #d0d0cc;
-    border-radius: 6px;
-    padding: 16px;
+[data-testid="stSidebar"] > div { padding: 28px 20px 32px; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] { color: var(--ink); }
+[data-testid="stSidebar"] .stFileUploader section {
+  background: rgba(255,255,255,.62);
+  border: 1px dashed #B8C9C2;
+  border-radius: var(--radius-panel);
+  padding: 14px;
 }
 
-/* Tabs */
+/* A selected tab sits inside a soft segmented control. */
 .stTabs [data-baseweb="tab-list"] {
-    background: transparent;
-    border-bottom: 2px solid #e5e5e3;
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #E4EBE8;
 }
-
 .stTabs [data-baseweb="tab"] {
-    font-size: 14px;
-    font-weight: 500;
-    color: #888;
-    padding: 12px 20px;
-    border-bottom: 2px solid transparent !important;
-    background: transparent !important;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 0 !important;
+  border-radius: 15px;
+  background: transparent !important;
+  color: var(--secondary) !important;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color .16s ease, color .16s ease;
 }
-
+.stTabs [data-baseweb="tab"]:hover { color: var(--ink) !important; }
 .stTabs [aria-selected="true"] {
-    color: #2d7e4d !important;
-    border-bottom: 2px solid #2d7e4d !important;
+  background: var(--surface-raised) !important;
+  color: var(--ink) !important;
+  box-shadow: 0 2px 8px rgba(31, 54, 49, .08);
 }
+.stTabs [data-baseweb="tab-highlight"] { display: none; }
+.stTabs [data-baseweb="tab-border"] { display: none; }
+.stTabs [data-baseweb="tab-panel"] { padding-top: 28px; }
 
-.stTabs [data-baseweb="tab-panel"] { padding-top: 32px; }
-
-/* Buttons */
-.stButton > button {
-    background: #ffffff !important;
-    border: 1px solid #d0d0cc !important;
-    color: #1a1a1a !important;
-    border-radius: 6px !important;
-    font-size: 13px !important;
-    font-weight: 500 !important;
-    padding: 10px 18px !important;
+/* Streamlit containers become Arc-like layered surfaces, not uniform tiles. */
+[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--surface);
+  border: 1px solid var(--line) !important;
+  border-radius: var(--radius-panel) !important;
+  box-shadow: 0 5px 18px rgba(41, 69, 62, .035);
 }
-
-.stButton > button:hover {
-    background: #f5f5f3 !important;
-    border-color: #2d7e4d !important;
+[data-testid="stMetric"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 18px 20px;
 }
+[data-testid="stMetricLabel"] p {
+  color: var(--muted) !important;
+  font-size: 12px;
+  font-weight: 500;
+}
+[data-testid="stMetricValue"] {
+  color: var(--ink);
+  font-family: 'Geist', 'Inter', sans-serif;
+  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-weight: 600;
+  letter-spacing: -.04em;
+}
+[data-testid="stMetricDelta"] { font-size: 12px; }
 
+/* Inputs, menus, buttons */
+.stTextInput input, .stNumberInput input, .stSelectbox [data-baseweb="select"] > div,
+.stDateInput input, .stMultiSelect [data-baseweb="select"] > div {
+  background: var(--surface-raised) !important;
+  border: 1px solid #CFDAD5 !important;
+  border-radius: var(--radius-control) !important;
+  color: var(--ink) !important;
+  min-height: 44px;
+}
+.stTextInput input:focus, .stNumberInput input:focus,
+.stDateInput input:focus {
+  border-color: var(--teal) !important;
+  box-shadow: 0 0 0 3px rgba(40, 118, 109, .15) !important;
+}
+.stButton > button, [data-testid="stDownloadButton"] > button {
+  min-height: 42px;
+  border: 1px solid #CFDAD5 !important;
+  border-radius: var(--radius-control) !important;
+  background: var(--surface-raised) !important;
+  color: var(--ink) !important;
+  font-weight: 500 !important;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+.stButton > button:hover, [data-testid="stDownloadButton"] > button:hover {
+  border-color: var(--teal) !important;
+  background: #F4F8F5 !important;
+}
 [data-testid="stFormSubmitButton"] > button {
-    background: #2d7e4d !important;
-    border: none !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    padding: 12px 28px !important;
-    border-radius: 6px !important;
-    width: 100%;
+  min-height: 48px;
+  border: 0 !important;
+  border-radius: 17px !important;
+  background: var(--teal) !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+[data-testid="stFormSubmitButton"] > button:hover { background: var(--teal-deep) !important; }
+button:focus-visible, a:focus-visible, input:focus-visible, [role="tab"]:focus-visible {
+  outline: 3px solid rgba(40,118,109,.48) !important;
+  outline-offset: 2px !important;
 }
 
-[data-testid="stFormSubmitButton"] > button:hover {
-    background: #226640 !important;
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  overflow: hidden;
 }
-
-/* Inputs */
-.stSelectbox > div > div,
-.stNumberInput > div > div > input {
-    background: #ffffff !important;
-    border: 1px solid #d0d0cc !important;
-    color: #1a1a1a !important;
-    border-radius: 6px !important;
-    font-size: 13px !important;
-}
-
-/* Data tables */
-.stDataFrame {
-    border: 1px solid #e5e5e3 !important;
-    border-radius: 6px !important;
-}
-
-/* Expander */
-.streamlit-expanderHeader {
-    background: #f5f5f3 !important;
-    border: 1px solid #e5e5e3 !important;
-    border-radius: 6px !important;
-    color: #1a1a1a !important;
-    font-size: 13px !important;
-    font-weight: 600 !important;
-}
-
-.streamlit-expanderContent {
-    background: #ffffff !important;
-    border: 1px solid #e5e5e3 !important;
-    border-top: none !important;
-}
-
-/* Metrics */
-[data-testid="metric-container"] {
-    background: #ffffff;
-    border: 1px solid #e5e5e3;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-[data-testid="metric-container"] > div:first-child {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    color: #888;
-    text-transform: uppercase;
-}
-
-[data-testid="metric-container"] > div:last-child {
-    font-size: 32px;
-    font-weight: 800;
-    color: #2d7e4d;
-}
-
-/* Alerts */
 [data-testid="stAlert"] {
-    background: #f5faf8 !important;
-    border: 1px solid #d4e8e2 !important;
-    border-radius: 6px !important;
-    color: #1a1a1a !important;
+  border-radius: 18px;
+  border: 1px solid var(--line);
 }
-
-/* Divider */
-.stDivider { margin: 32px 0 !important; }
-
-/* Hide chrome */
-#MainMenu, footer, header { visibility: hidden; }
-[data-testid="stDecoration"] { display: none; }
-
-/* Status indicator card */
-.status-card {
-    background: #ffffff;
-    border: 1px solid #e5e5e3;
-    border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+[data-testid="stExpander"] {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255,255,255,.52);
 }
+hr { border-color: var(--line) !important; }
 
-.status-icon {
-    font-size: 24px;
-    margin-bottom: 8px;
+/* Header and signature distribution-flow panel. */
+.brand-row { display:flex; align-items:center; gap:12px; margin-bottom:28px; }
+.brand-symbol {
+  display:grid; place-items:center; width:40px; height:40px;
+  border-radius:15px; background:var(--teal); color:white; font-size:19px;
 }
-
-.status-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #888;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    margin-bottom: 8px;
+.brand-name { font:600 16px 'Geist','Inter',sans-serif; color:var(--ink); letter-spacing:-.02em; }
+.brand-sub { margin-top:2px; font-size:11px; color:var(--muted); }
+.page-head { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin: 4px 0 26px; }
+.page-title { font:600 clamp(28px,3vw,42px)/1.08 'Geist','Inter',sans-serif; letter-spacing:-.045em; color:var(--ink); max-width:780px; }
+.page-note { margin-top:10px; max-width:650px; font-size:14px; line-height:1.65; color:var(--secondary); }
+.model-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:rgba(255,255,255,.56); color:var(--secondary); font-size:12px; white-space:nowrap; }
+.pill-dot { width:8px; height:8px; border-radius:50%; background:var(--amber); }
+.pill-dot.ready { background:var(--teal); box-shadow:0 0 0 4px rgba(40,118,109,.12); }
+.flow-panel {
+  position:relative; overflow:hidden; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);
+  gap:28px; align-items:center; min-height:230px; padding:32px 34px;
+  border:1px solid #D2DFD9; border-radius:var(--radius-hero);
+  background:linear-gradient(115deg,#F9FBF8 0%,#F2F7F4 58%,#E9F1ED 100%);
 }
-
-.status-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin-bottom: 4px;
+.flow-copy { position:relative; z-index:1; }
+.flow-copy h2 { margin:0 0 10px; max-width:570px; }
+.flow-copy p { margin:0; max-width:570px; font-size:14px; line-height:1.7; }
+.flow-graphic { display:flex; align-items:center; justify-content:center; gap:8px; padding:16px; }
+.flow-node {
+  display:flex; flex-direction:column; justify-content:center; width:106px; height:106px; padding:13px;
+  border:1px solid rgba(74,112,101,.16); border-radius:30px; background:rgba(255,255,255,.78);
+  box-shadow:0 8px 24px rgba(50,80,70,.06);
 }
+.flow-node strong { font:600 17px 'Geist','Inter',sans-serif; color:var(--ink); letter-spacing:-.03em; }
+.flow-node span { margin-top:6px; color:var(--muted); font-size:10px; line-height:1.3; }
+.flow-node.active { background:var(--teal); border-color:var(--teal); transform:translateY(-8px); }
+.flow-node.active strong, .flow-node.active span { color:white; }
+.flow-link { width:20px; height:2px; background:#A9BCB4; position:relative; }
+.flow-link:after { content:''; position:absolute; right:-1px; top:-3px; width:7px; height:7px; border-top:2px solid #A9BCB4; border-right:2px solid #A9BCB4; transform:rotate(45deg); }
+.section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:8px 0 16px; }
+.section-heading h3 { margin:0; }
+.section-heading span { color:var(--muted); font-size:12px; }
+.panel-title { margin:0 0 8px; font:600 16px 'Geist','Inter',sans-serif; color:var(--ink); }
+.panel-hint { margin:0 0 18px; font-size:12px; line-height:1.5; color:var(--muted); }
+.empty-panel { display:flex; flex-direction:column; justify-content:center; min-height:235px; padding:24px; border:1px dashed #B8C9C2; border-radius:24px; background:rgba(255,255,255,.48); }
+.empty-panel strong { margin-bottom:8px; font:600 17px 'Geist','Inter',sans-serif; color:var(--ink); }
+.empty-panel span { max-width:440px; font-size:13px; line-height:1.65; color:var(--secondary); }
+.result-panel { padding:24px; border-radius:26px; background:#E5F0EC; border:1px solid #C8DDD5; }
+.result-number { font:600 clamp(32px,4vw,48px)/1 'Geist','Inter',sans-serif; color:var(--teal-deep); letter-spacing:-.05em; }
+.result-caption { margin-top:8px; color:var(--secondary); font-size:12px; }
+.status-note { padding:14px 16px; border-radius:16px; background:#F2F5E8; color:#52633C; font-size:13px; line-height:1.55; }
 
-.status-desc {
-    font-size: 12px;
-    color: #888;
+#MainMenu, footer, [data-testid="stDecoration"] { visibility:hidden; }
+@media (max-width: 900px) {
+  .block-container { padding:24px 22px 52px !important; }
+  .flow-panel { grid-template-columns:1fr; }
+  .flow-graphic { justify-content:flex-start; padding:10px 0 0; }
 }
-
-.status-good { border-left: 4px solid #2d7e4d; }
-.status-alert { border-left: 4px solid #f59e0b; }
-.status-critical { border-left: 4px solid #dc2626; }
-
-/* Alert badge */
-.alert-badge {
-    display: inline-block;
-    background: #fee2e2;
-    color: #991b1b;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 600;
+@media (max-width: 600px) {
+  .block-container { padding:18px 14px 40px !important; }
+  .page-head { flex-direction:column; }
+  .flow-panel { padding:24px 20px; border-radius:26px; }
+  .flow-graphic { gap:5px; }
+  .flow-node { width:82px; height:88px; padding:10px; border-radius:23px; }
+  .flow-node strong { font-size:14px; }
+  .flow-link { width:12px; }
+  .stTabs [data-baseweb="tab-list"] { width:100%; overflow-x:auto; }
+  .stTabs [data-baseweb="tab"] { padding:0 13px; font-size:12px; }
 }
-
-.alert-badge.warning {
-    background: #fef3c7;
-    color: #92400e;
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
 }
-
-/* Hero intro */
-.intro-section {
-    background: linear-gradient(135deg, #f0f7f3 0%, #faf9f7 100%);
-    border: 1px solid #e5e5e3;
-    border-radius: 8px;
-    padding: 36px 40px;
-    margin-bottom: 32px;
-}
-
-.intro-emoji { font-size: 48px; margin-bottom: 12px; }
-.intro-title { font-size: 32px; font-weight: 700; color: #1a1a1a; margin-bottom: 8px; }
-.intro-desc { font-size: 14px; color: #555; line-height: 1.6; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# ══════════════════════════════════════════════════════════
-# MATPLOTLIB — Light theme matching dashboard
-# ══════════════════════════════════════════════════════════
+# Chart palette follows semantic dashboard tokens.
+INK = "#1B2929"
+TEAL = "#28766D"
+CITRON = "#B8D85D"
+AMBER = "#D58B5B"
+MUTED = "#788783"
+LINE = "#DCE5E1"
+SURFACE = "#FBFCFA"
+
 plt.rcParams.update({
-    'figure.facecolor': '#f8f9f7',
-    'axes.facecolor': '#ffffff',
-    'axes.edgecolor': '#e5e5e3',
-    'axes.labelcolor': '#555',
-    'axes.titlecolor': '#1a1a1a',
-    'axes.titlesize': 13,
-    'axes.titleweight': 'bold',
-    'axes.labelsize': 11,
-    'xtick.color': '#888',
-    'ytick.color': '#888',
-    'grid.color': '#f0f0ed',
-    'grid.linewidth': 0.8,
-    'grid.alpha': 0.5,
-    'legend.facecolor': '#ffffff',
-    'legend.edgecolor': '#e5e5e3',
-    'legend.fontsize': 10,
-    'text.color': '#1a1a1a',
+    "figure.facecolor": SURFACE,
+    "axes.facecolor": SURFACE,
+    "axes.edgecolor": LINE,
+    "axes.labelcolor": MUTED,
+    "axes.titlecolor": INK,
+    "axes.titlesize": 12,
+    "axes.titleweight": "medium",
+    "axes.labelsize": 10,
+    "xtick.color": MUTED,
+    "ytick.color": MUTED,
+    "grid.color": LINE,
+    "grid.linewidth": 0.7,
+    "grid.alpha": 0.65,
+    "text.color": INK,
+    "font.family": "sans-serif",
 })
 
-C_GREEN = '#2d7e4d'
-C_LIGHT_GREEN = '#4caf50'
-C_GRAY = '#888'
-C_BORDER = '#e5e5e3'
-PALETTE = ['#2d7e4d', '#4caf50', '#81c784', '#a5d6a7', '#c8e6c9', '#e8f5e9']
-
-# ══════════════════════════════════════════════════════════
-# PKL LOADING
-# ══════════════════════════════════════════════════════════
-PKL_FILES = {
-    'rf': 'model_rf_pupuk.pkl',
-    'xgb': 'model_xgb_pupuk.pkl',
-    'le_pupuk': 'encoder_pupuk.pkl',
-    'le_kec': 'encoder_kecamatan.pkl',
+MODEL_FILES = {
+    "rf": "model_rf_pupuk.pkl",
+    "xgb": "model_xgb_pupuk.pkl",
+    "le_pupuk": "encoder_pupuk.pkl",
+    "le_kec": "encoder_kecamatan.pkl",
 }
+DEFAULT_FEATURES = [
+    "Jenis Pupuk Enc", "Kecamatan Enc", "Bulan", "Tahun", "RDKK (ton)", "Alokasi (ton)"
+]
 
-@st.cache_resource
-def load_models():
-    base = os.path.dirname(os.path.abspath(__file__))
-    if not os.path.exists(os.path.join(base, 'model_rf_pupuk.pkl')):
-        if os.path.exists('/mount/src'):
-            base = '/mount/src'
-        else:
-            base = os.getcwd()
 
-    models = {'_base': base}
-    missing = []
-    
-    for key, fname in PKL_FILES.items():
-        path = os.path.join(base, fname)
-        if os.path.exists(path):
-            try:
-                models[key] = joblib.load(path)
-            except:
-                missing.append(fname)
-        else:
-            missing.append(fname)
-
-    try:
-        with open(os.path.join(base, 'feature_names.json')) as f:
-            models['features'] = json.load(f)
-    except:
-        models['features'] = ['Jenis Pupuk Enc', 'Kecamatan Enc', 'Bulan', 'Tahun', 'RDKK (ton)', 'Alokasi (ton)']
-
-    models['missing'] = missing
-    return models
-
-M = load_models()
-models_ok = len(M['missing']) == 0
-
-# ══════════════════════════════════════════════════════════
-# SIDEBAR
-# ══════════════════════════════════════════════════════════
-with st.sidebar:
-    st.markdown("### Pupuk Prediksi")
-    st.caption("Sistem prediksi realisasi penyaluran pupuk")
-    st.divider()
-    
-    st.markdown("**Dataset**")
-    uploaded = st.file_uploader("Pilih file .xlsx", type=["xlsx"], label_visibility="collapsed")
-    
-    st.divider()
-    st.markdown("**Model**")
-    st.caption("Random Forest + XGBoost")
-    st.caption("pkl-based • tanpa training ulang")
-
-# ══════════════════════════════════════════════════════════
-# HEADER
-# ══════════════════════════════════════════════════════════
-st.markdown("""
-<div class="intro-section">
-    <div class="intro-emoji">🌱</div>
-    <div class="intro-title">Prediksi Realisasi Pupuk Bersubsidi</div>
-    <div class="intro-desc">
-        Sistem machine learning untuk estimasi realisasi penyaluran pupuk berdasarkan data historis. 
-        Menggunakan Random Forest dan XGBoost untuk prediksi akurat di setiap kecamatan.
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════
-# ERROR STATE
-# ══════════════════════════════════════════════════════════
-if not models_ok:
-    st.error(f"**Model files belum ada:** {', '.join(M['missing'])}")
-    
-    with st.expander("📋 Cara upload model dari Colab"):
-        st.write("""
-        1. **Jalankan notebook** di Google Colab (Bagian 1–12)
-        2. **Simpan pkl** ke Google Drive (Bagian 12)
-        3. **Download** 5 file pkl ke komputer
-        4. **Upload ke GitHub** di folder root repo
-        5. **Commit & push** — Streamlit Cloud auto re-deploy
-        """)
-    st.stop()
-
-# ══════════════════════════════════════════════════════════
-# MODEL LOADED
-# ══════════════════════════════════════════════════════════
-rf_model = M['rf']
-xgb_model = M['xgb']
-le_pupuk = M['le_pupuk']
-le_kec = M['le_kec']
-FEATURES = M['features']
-jenis_list = list(le_pupuk.classes_)
-kec_list = list(le_kec.classes_)
-
-st.success("✓ Model dimuat — siap prediksi")
-
-# ══════════════════════════════════════════════════════════
-# STATUS OVERVIEW (Botanist-style)
-# ══════════════════════════════════════════════════════════
-st.markdown("### Status Sistem")
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("Model Aktif", "RF + XGB", "2 algoritma")
-with col2:
-    st.metric("Jenis Pupuk", len(jenis_list), "kategori")
-with col3:
-    st.metric("Kecamatan", len(kec_list), "wilayah")
-with col4:
-    st.metric("Data", "2017–2025", "9 tahun")
-
-st.divider()
-
-# ══════════════════════════════════════════════════════════
-# LOAD DATASET
-# ══════════════════════════════════════════════════════════
-df = None
-if uploaded is not None:
-    @st.cache_data
-    def load_data(file):
-        from sklearn.preprocessing import LabelEncoder
-        df = pd.read_excel(file)
-        df['Bulan'] = df['Bulan'].ffill().astype(int)
-        drop_cols = ['NO', 'Kelompok Tani', 'Alokasi Vs RDKK (%)', 'Realisasi Vs Alokasi (%)']
-        df = df.drop(columns=[c for c in drop_cols if c in df.columns])
-        for col in ['Realisasi (ton)', 'RDKK (ton)', 'Alokasi (ton)']:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(df[col].median())
-        df['Kecamatan'] = df['Kecamatan'].str.strip().str.title()
-        df['Jenis Pupuk'] = df['Jenis Pupuk'].str.strip()
-        df['Jenis Pupuk Enc'] = LabelEncoder().fit_transform(df['Jenis Pupuk'])
-        df['Kecamatan Enc'] = LabelEncoder().fit_transform(df['Kecamatan'])
-        return df
-    df = load_data(uploaded)
-
-# ══════════════════════════════════════════════════════════
-# TABS
-# ══════════════════════════════════════════════════════════
-tab1, tab2, tab3, tab4 = st.tabs(["Data", "Model", "Prediksi", "Analisis"])
-
-# ─────────────────────────
-# TAB 1: DATA
-# ─────────────────────────
-with tab1:
-    if df is None:
-        st.info("📊 Upload dataset di sidebar untuk melihat exploratory analysis")
-    else:
-        st.markdown(f"### Dataset · {len(df):,} records")
-        
-        with st.expander("Lihat data", expanded=False):
-            st.dataframe(df.head(30), use_container_width=True)
-
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### Realisasi per Jenis Pupuk")
-            d = df.groupby('Jenis Pupuk')['Realisasi (ton)'].sum().sort_values(ascending=False)
-            fig, ax = plt.subplots(figsize=(7, 4))
-            ax.bar(d.index, d.values, color=PALETTE, edgecolor='none', alpha=0.85)
-            ax.set_ylabel("Realisasi (ton)")
-            ax.grid(axis='y', alpha=0.3, linestyle='-', linewidth=0.5)
-            ax.set_axisbelow(True)
-            plt.xticks(rotation=30, ha='right')
-            plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
-
-        with col2:
-            st.markdown("#### Tren Tahunan")
-            tren = df.groupby('Tahun')['Realisasi (ton)'].sum()
-            fig, ax = plt.subplots(figsize=(7, 4))
-            ax.plot(tren.index, tren.values, linewidth=3, color=C_GREEN, marker='o', markersize=7)
-            ax.fill_between(tren.index, tren.values, alpha=0.15, color=C_GREEN)
-            ax.set_ylabel("Realisasi (ton)")
-            ax.grid(alpha=0.3)
-            ax.set_axisbelow(True)
-            plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
-
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            st.markdown("#### Korelasi Variabel")
-            cols = ['Realisasi (ton)', 'Alokasi (ton)', 'RDKK (ton)', 'Bulan', 'Tahun']
-            fig, ax = plt.subplots(figsize=(5.5, 4.5))
-            sns.heatmap(df[cols].corr(), annot=True, fmt='.2f', cmap='RdYlGn', ax=ax, 
-                        center=0, cbar_kws={'shrink': 0.8}, linewidths=0.5)
-            plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
-
-        with col4:
-            st.markdown("#### Statistik")
-            st.dataframe(df[['Realisasi (ton)', 'Alokasi (ton)', 'RDKK (ton)']].describe().round(2), 
-                        use_container_width=True)
-
-# ─────────────────────────
-# TAB 2: MODEL
-# ─────────────────────────
-with tab2:
-    st.markdown("### Evaluasi Model")
-
-    live_eval = False
-    if df is not None:
+def model_roots() -> list[Path]:
+    """Likely repo roots for local runs and Streamlit Cloud."""
+    roots: list[Path] = []
+    for raw in (Path(__file__).resolve().parent, Path.cwd(), Path("/mount/src")):
         try:
-            from sklearn.model_selection import train_test_split
-            df2 = df.copy()
-            df2['Jenis Pupuk Enc'] = le_pupuk.transform(df2['Jenis Pupuk'])
-            df2['Kecamatan Enc'] = le_kec.transform(df2['Kecamatan'])
-            X = df2[FEATURES]
-            y = df2['Realisasi (ton)']
-            _, Xte, _, yte = train_test_split(X, y, test_size=0.2, random_state=42)
-            
-            rfp = rf_model.predict(Xte)
-            xgbp = xgb_model.predict(Xte)
-            
-            mrf = {'mae': mean_absolute_error(yte, rfp), 'rmse': np.sqrt(mean_squared_error(yte, rfp)), 'r2': r2_score(yte, rfp)}
-            mxgb = {'mae': mean_absolute_error(yte, xgbp), 'rmse': np.sqrt(mean_squared_error(yte, xgbp)), 'r2': r2_score(yte, xgbp)}
-            live_eval = True
-        except:
-            pass
+            path = raw.resolve()
+        except OSError:
+            continue
+        for candidate in (path, path / "models", path / "artifacts"):
+            if candidate not in roots:
+                roots.append(candidate)
+    return roots
 
-    if not live_eval:
-        mrf = {'mae': 8.71, 'rmse': 20.62, 'r2': 0.9919}
-        mxgb = {'mae': 7.63, 'rmse': 16.41, 'r2': 0.9948}
 
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**Random Forest**")
-        st.metric("MAE", f"{mrf['mae']:.2f} ton")
-        st.metric("RMSE", f"{mrf['rmse']:.2f} ton")
-        st.metric("R² Score", f"{mrf['r2']:.4f}")
+def model_fingerprint() -> tuple:
+    """Include file mtimes in cache key so newly committed files reload."""
+    signature = []
+    for name in [*MODEL_FILES.values(), "feature_names.json"]:
+        found = next((root / name for root in model_roots() if (root / name).is_file()), None)
+        if found:
+            try:
+                signature.append((str(found), found.stat().st_mtime_ns, found.stat().st_size))
+            except OSError:
+                signature.append((str(found), 0, 0))
+        else:
+            signature.append((name, None, None))
+    return tuple(signature)
 
-    with col2:
-        st.markdown("**XGBoost**")
-        st.metric("MAE", f"{mxgb['mae']:.2f} ton")
-        st.metric("RMSE", f"{mxgb['rmse']:.2f} ton")
-        st.metric("R² Score", f"{mxgb['r2']:.4f}")
 
-    st.divider()
-    st.markdown("### Feature Importance")
+@st.cache_resource(show_spinner="Memuat model…")
+def load_models(fingerprint: tuple) -> dict:
+    roots = model_roots()
+    loaded: dict = {"errors": {}, "paths": {}}
+    for key, filename in MODEL_FILES.items():
+        path = next((root / filename for root in roots if (root / filename).is_file()), None)
+        if path is None:
+            loaded["errors"][key] = f"File tidak ditemukan: {filename}"
+            continue
+        try:
+            loaded[key] = joblib.load(path)
+            loaded["paths"][key] = str(path)
+        except Exception as exc:
+            loaded["errors"][key] = f"Gagal membaca {path}: {type(exc).__name__}: {exc}"
 
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        imp_rf = pd.Series(rf_model.feature_importances_, index=FEATURES).sort_values()
-        fig, ax = plt.subplots(figsize=(6.5, 3.5))
-        ax.barh(imp_rf.index, imp_rf.values, color=C_GREEN, alpha=0.8, edgecolor='none')
-        ax.set_xlabel("Importance")
-        ax.grid(axis='x', alpha=0.3)
-        ax.set_axisbelow(True)
-        plt.tight_layout()
-        st.pyplot(fig, use_container_width=True)
-        st.caption("Random Forest")
+    feature_file = next((root / "feature_names.json" for root in roots if (root / "feature_names.json").is_file()), None)
+    if feature_file:
+        try:
+            with feature_file.open(encoding="utf-8") as handle:
+                loaded["features"] = json.load(handle)
+            loaded["paths"]["features"] = str(feature_file)
+        except Exception as exc:
+            loaded["errors"]["features"] = f"Gagal membaca {feature_file}: {exc}"
+            loaded["features"] = DEFAULT_FEATURES
+    else:
+        loaded["features"] = DEFAULT_FEATURES
+    return loaded
 
-    with col2:
-        imp_xgb = pd.Series(xgb_model.feature_importances_, index=FEATURES).sort_values()
-        fig, ax = plt.subplots(figsize=(6.5, 3.5))
-        ax.barh(imp_xgb.index, imp_xgb.values, color=C_LIGHT_GREEN, alpha=0.8, edgecolor='none')
-        ax.set_xlabel("Importance")
-        ax.grid(axis='x', alpha=0.3)
-        ax.set_axisbelow(True)
-        plt.tight_layout()
-        st.pyplot(fig, use_container_width=True)
-        st.caption("XGBoost")
 
-# ─────────────────────────
-# TAB 3: PREDIKSI
-# ─────────────────────────
-with tab3:
-    st.markdown("### Buat Prediksi")
-    st.write("Masukkan parameter untuk mendapatkan estimasi realisasi.")
+def clean_dataset(file_bytes: bytes) -> pd.DataFrame:
+    """Read and normalize source workbook columns without fitting new encoders."""
+    frame = pd.read_excel(io.BytesIO(file_bytes))
+    required = ["Bulan", "Tahun", "Jenis Pupuk", "Kecamatan", "RDKK (ton)", "Alokasi (ton)", "Realisasi (ton)"]
+    missing_cols = [column for column in required if column not in frame.columns]
+    if missing_cols:
+        raise ValueError("Kolom wajib tidak ditemukan: " + ", ".join(missing_cols))
 
-    with st.form("pred_form"):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            jenis = st.selectbox("Jenis Pupuk", sorted(jenis_list))
-            kec = st.selectbox("Kecamatan", sorted(kec_list))
-        
-        with col2:
-            months = {1:"Januari",2:"Februari",3:"Maret",4:"April",5:"Mei",6:"Juni",
-                      7:"Juli",8:"Agustus",9:"September",10:"Oktober",11:"November",12:"Desember"}
-            bln_name = st.selectbox("Bulan", list(months.values()), index=5)
-            bln = [k for k, v in months.items() if v == bln_name][0]
-        
-        with col3:
-            tahun = st.number_input("Tahun", 2017, 2035, 2025)
+    frame = frame.copy()
+    frame["Bulan"] = pd.to_numeric(frame["Bulan"].ffill(), errors="coerce")
+    frame["Tahun"] = pd.to_numeric(frame["Tahun"], errors="coerce")
+    for column in ("RDKK (ton)", "Alokasi (ton)", "Realisasi (ton)"):
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    frame["Jenis Pupuk"] = frame["Jenis Pupuk"].astype("string").str.strip()
+    frame["Kecamatan"] = frame["Kecamatan"].astype("string").str.strip().str.title()
+    frame = frame.dropna(subset=["Bulan", "Tahun", "Jenis Pupuk", "Kecamatan", "Realisasi (ton)"])
+    frame["Bulan"] = frame["Bulan"].astype(int)
+    frame["Tahun"] = frame["Tahun"].astype(int)
+    return frame
 
-        col4, col5 = st.columns(2)
-        with col4:
-            rdkk = st.number_input("RDKK (ton)", 0.0, 10000.0, 500.0, 50.0)
-        with col5:
-            alokasi = st.number_input("Alokasi (ton)", 0.0, 10000.0, 300.0, 50.0)
 
-        submit = st.form_submit_button("Hitung", use_container_width=True, type="primary")
+@st.cache_data(show_spinner="Membaca dataset…")
+def cached_dataset(file_bytes: bytes) -> pd.DataFrame:
+    return clean_dataset(file_bytes)
 
-    if submit:
-        inp = pd.DataFrame([{
-            'Jenis Pupuk Enc': le_pupuk.transform([jenis])[0],
-            'Kecamatan Enc': le_kec.transform([kec])[0],
-            'Bulan': bln,
-            'Tahun': tahun,
-            'RDKK (ton)': rdkk,
-            'Alokasi (ton)': alokasi,
-        }])[FEATURES]
 
-        prf = float(rf_model.predict(inp)[0])
-        pxgb = float(xgb_model.predict(inp)[0])
+def ton(value: float | int) -> str:
+    return f"{value:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-        st.divider()
-        st.markdown("### Hasil")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Random Forest", f"{prf:.1f} ton", delta="prediksi")
-        with col2:
-            st.metric("XGBoost", f"{pxgb:.1f} ton", delta="prediksi")
+def show_chart(fig) -> None:
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
-        st.divider()
-        st.markdown("### Input Summary")
-        summary = pd.DataFrame({
-            'Parameter': ['Pupuk', 'Kecamatan', 'Bulan', 'Tahun', 'RDKK', 'Alokasi'],
-            'Nilai': [jenis, kec, bln_name, tahun, f"{rdkk:.0f}", f"{alokasi:.0f}"]
+
+def make_flow_panel(model_ready: bool) -> None:
+    status_line = (
+        "Model siap menerima input distribusi. Pilih jenis pupuk, kecamatan, periode, dan volume alokasi."
+        if model_ready else
+        "Panel prediksi aktif setelah semua model dan encoder tersedia di root repo GitHub."
+    )
+    st.markdown(
+        f"""
+        <section class="flow-panel">
+          <div class="flow-copy">
+            <h2>RDKK masuk. Alokasi bergerak. Realisasi terbaca.</h2>
+            <p>{status_line}</p>
+          </div>
+          <div class="flow-graphic" aria-label="Alur distribusi pupuk">
+            <div class="flow-node"><strong>RDKK</strong><span>kebutuhan<br>kelompok tani</span></div>
+            <div class="flow-link"></div>
+            <div class="flow-node"><strong>Alokasi</strong><span>pupuk tersedia<br>untuk wilayah</span></div>
+            <div class="flow-link"></div>
+            <div class="flow-node active"><strong>Realisasi</strong><span>volume yang<br>diperkirakan</span></div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def draw_trend(frame: pd.DataFrame) -> None:
+    if frame is None or frame.empty:
+        st.markdown(
+            '<div class="empty-panel"><strong>Belum ada seri realisasi</strong>'
+            '<span>Unggah workbook dari sidebar. Tren tahunan dan komposisi pupuk akan dihitung dari baris data yang terbaca.</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+    yearly = frame.groupby("Tahun", as_index=False)["Realisasi (ton)"].sum().sort_values("Tahun")
+    fig, ax = plt.subplots(figsize=(9, 3.3))
+    ax.plot(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, linewidth=2.8, marker="o", markersize=6)
+    ax.fill_between(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, alpha=.10)
+    ax.grid(axis="y")
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.spines["bottom"].set_color(LINE)
+    ax.tick_params(axis="both", length=0, pad=8)
+    ax.set_ylabel("Realisasi (ton)")
+    ax.set_xlabel("")
+    ax.margins(x=.04)
+    fig.tight_layout(pad=1.3)
+    show_chart(fig)
+
+
+def draw_product_mix(frame: pd.DataFrame) -> None:
+    if frame is None or frame.empty:
+        st.markdown(
+            '<div class="empty-panel"><strong>Komposisi pupuk menunggu data</strong>'
+            '<span>Ringkasan menunjukkan jenis pupuk dengan realisasi terbesar setelah dataset dimuat.</span></div>',
+            unsafe_allow_html=True,
+        )
+        return
+    grouped = frame.groupby("Jenis Pupuk")["Realisasi (ton)"].sum().sort_values()
+    fig, ax = plt.subplots(figsize=(6, 3.3))
+    colors = [TEAL if i == len(grouped) - 1 else "#AFC9BF" for i in range(len(grouped))]
+    ax.barh(grouped.index, grouped.values, color=colors, height=.56)
+    ax.spines[["top", "right", "left", "bottom"]].set_visible(False)
+    ax.tick_params(axis="both", length=0, pad=8)
+    ax.grid(axis="x", alpha=.55)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("Realisasi (ton)")
+    fig.tight_layout(pad=1.3)
+    show_chart(fig)
+
+
+def evaluate_models(frame: pd.DataFrame, models: dict) -> tuple[dict, dict] | None:
+    if frame is None or frame.empty:
+        return None
+    if any(key not in models for key in ("rf", "xgb", "le_pupuk", "le_kec")):
+        return None
+    data = frame.copy()
+    data["Jenis Pupuk Enc"] = models["le_pupuk"].transform(data["Jenis Pupuk"])
+    data["Kecamatan Enc"] = models["le_kec"].transform(data["Kecamatan"])
+    features = models["features"]
+    x = data[features]
+    y = data["Realisasi (ton)"]
+    if len(data) < 5:
+        return None
+    _, x_test, _, y_test = train_test_split(x, y, test_size=.2, random_state=42)
+    metrics = []
+    for key in ("rf", "xgb"):
+        pred = models[key].predict(x_test)
+        metrics.append({
+            "mae": mean_absolute_error(y_test, pred),
+            "rmse": np.sqrt(mean_squared_error(y_test, pred)),
+            "r2": r2_score(y_test, pred),
         })
-        st.dataframe(summary, use_container_width=True, hide_index=True)
+    return metrics[0], metrics[1]
 
-        if alokasi > 0:
-            st.markdown("### Analisis Penyerapan")
-            pct_rf = (prf / alokasi) * 100
-            pct_xgb = (pxgb / alokasi) * 100
 
-            fig, ax = plt.subplots(figsize=(7, 3))
-            y_pos = [0, 1]
-            cols_pct = [C_LIGHT_GREEN, C_GREEN]
-            ax.barh(y_pos, [pct_xgb, pct_rf], color=cols_pct, alpha=0.85, height=0.4)
-            ax.axvline(100, color='#d0d0cc', linestyle='--', linewidth=2)
-            ax.set_yticks(y_pos)
-            ax.set_yticklabels(['XGBoost', 'Random Forest'])
-            ax.set_xlabel("Penyerapan Alokasi (%)")
-            ax.grid(axis='x', alpha=0.3)
-            ax.set_axisbelow(True)
-            
-            for i, (y, pct) in enumerate([(0, pct_xgb), (1, pct_rf)]):
-                ax.text(pct + 3, y, f'{pct:.0f}%', va='center', fontsize=12, fontweight='700')
-            
-            plt.tight_layout()
-            st.pyplot(fig, use_container_width=True)
+# Load models without blocking data exploration when repository files are absent.
+models = load_models(model_fingerprint())
+model_ready = all(key in models for key in MODEL_FILES)
 
-# ─────────────────────────
-# TAB 4: ANALISIS
-# ─────────────────────────
-with tab4:
-    st.markdown("### Insights & Rekomendasi")
-
-    st.write("""
-    **Performa Model**
-    
-    Kedua model mencapai R² > 0.99 dengan MAE < 10 ton, menunjukkan akurasi tinggi 
-    untuk keperluan perencanaan distribusi pupuk ke lapangan.
-    """)
-
-    st.write("""
-    **Insight dari Data**
-    
-    • **Alokasi mendominasi** — fitur paling berpengaruh pada prediksi (>70%)
-    • **Gap konsisten** — RDKK selalu lebih tinggi dari alokasi di semua kecamatan
-    • **Variasi per pupuk** — beberapa jenis lebih mudah direalisasikan
-    • **Tren stabil** — realisasi tahunan konsisten dengan fluktuasi kecil
-    """)
-
+with st.sidebar:
+    st.markdown(
+        """
+        <div class="brand-row">
+          <div class="brand-symbol">⌁</div>
+          <div><div class="brand-name">Arus Pupuk</div><div class="brand-sub">Distribusi bersubsidi · Lombok Barat</div></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown("**Dataset**")
+    uploaded = st.file_uploader("Pilih workbook Excel", type=["xlsx"], label_visibility="collapsed")
+    st.caption("Data dipakai untuk ringkasan dan evaluasi langsung.")
     st.divider()
-
-    st.markdown("### Rekomendasi")
-    st.write("""
-    1. Gunakan model untuk **perencanaan pre-musim** — estimasi realisasi sebelum distribusi dimulai
-    2. Monitor **gap RDKK-Alokasi** — pertimbangkan peningkatan untuk jenis/wilayah dengan deficit
-    3. Kumpulkan **data lebih detail** — curah hujan, musim, kondisi pasar meningkatkan akurasi
-    4. Deploy ke **sistem real-time** — integrasikan prediksi ke dashboard dinas pertanian
-    """)
-
+    st.markdown("**Kesiapan model**")
+    st.markdown(
+        f'<div class="model-pill"><span class="pill-dot {"ready" if model_ready else ""}"></span>'
+        f'{"Siap membuat prediksi" if model_ready else "File model belum lengkap"}</div>',
+        unsafe_allow_html=True,
+    )
+    if not model_ready:
+        with st.expander("File yang belum terbaca"):
+            for message in models.get("errors", {}).values():
+                st.caption(message)
+            st.caption("Lokasi yang diperiksa: folder app.py, folder models/artifacts, dan working directory.")
     st.divider()
-    st.caption("Built with Random Forest + XGBoost | pkl-based inference | Streamlit Cloud deployment")
+    st.caption("Random Forest + XGBoost")
+    st.caption("Prediksi realisasi dalam ton")
+
+frame = None
+if uploaded is not None:
+    try:
+        frame = cached_dataset(uploaded.getvalue())
+    except Exception as exc:
+        st.sidebar.error(f"Dataset tidak terbaca: {exc}")
+
+st.markdown(
+    f"""
+    <header class="page-head">
+      <div>
+        <div class="page-title">Distribusi pupuk, terbaca jelas.</div>
+        <div class="page-note">Pantau realisasi historis dan estimasi penyaluran per jenis pupuk serta kecamatan.</div>
+      </div>
+      <div class="model-pill"><span class="pill-dot {"ready" if model_ready else ""}"></span>{"Model siap" if model_ready else "Model belum lengkap"}</div>
+    </header>
+    """,
+    unsafe_allow_html=True,
+)
+make_flow_panel(model_ready)
+
+# Real values appear only when the user supplies the workbook. No placeholder metrics.
+row = st.columns(4)
+if frame is not None and not frame.empty:
+    total_realization = frame["Realisasi (ton)"].sum()
+    total_allocation = frame["Alokasi (ton)"].sum()
+    absorption = (total_realization / total_allocation * 100) if total_allocation else np.nan
+    latest_year = int(frame["Tahun"].max())
+    summary_values = [
+        ("Realisasi tercatat", f"{ton(total_realization)} ton", "total pada dataset"),
+        ("Alokasi tercatat", f"{ton(total_allocation)} ton", "total pada dataset"),
+        ("Serapan", f"{ton(absorption)}%" if np.isfinite(absorption) else "—", "realisasi ÷ alokasi"),
+        ("Wilayah / jenis", f"{frame['Kecamatan'].nunique()} / {frame['Jenis Pupuk'].nunique()}", f"hingga {latest_year}"),
+    ]
+else:
+    summary_values = [
+        ("Realisasi tercatat", "—", "unggah dataset untuk dihitung"),
+        ("Alokasi tercatat", "—", "unggah dataset untuk dihitung"),
+        ("Serapan", "—", "realisasi dibanding alokasi"),
+        ("Wilayah / jenis", "—", "dihitung dari dataset"),
+    ]
+for cell, (label, value, note) in zip(row, summary_values):
+    with cell:
+        st.metric(label, value, help=note)
+
+st.write("")
+overview_tab, predict_tab, data_tab, model_tab = st.tabs(["Ringkasan", "Prediksi", "Dataset", "Model"])
+
+with overview_tab:
+    st.markdown(
+        '<div class="section-heading"><h3>Jejak realisasi</h3>'
+        '<span>Jumlah per tahun</span></div>',
+        unsafe_allow_html=True,
+    )
+    left, right = st.columns([1.35, .9], gap="large")
+    with left:
+        with st.container(border=True):
+            st.markdown('<div class="panel-title">Realisasi tahunan</div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-hint">Total tonase yang tercatat per tahun.</div>', unsafe_allow_html=True)
+            draw_trend(frame)
+    with right:
+        with st.container(border=True):
+            st.markdown('<div class="panel-title">Komposisi jenis pupuk</div>', unsafe_allow_html=True)
+            st.markdown('<div class="panel-hint">Perbandingan total realisasi dalam dataset.</div>', unsafe_allow_html=True)
+            draw_product_mix(frame)
+    if frame is None:
+        st.markdown(
+            '<div class="status-note">Mulai dengan unggah file <b>Data-pupuk-bersubsidi.xlsx</b> dari panel kiri. '
+            'Dashboard mengisi angka dari data nyata; tidak ada metrik contoh.</div>',
+            unsafe_allow_html=True,
+        )
+
+with predict_tab:
+    st.markdown('<div class="section-heading"><h3>Buat estimasi</h3><span>Hasil dalam ton</span></div>', unsafe_allow_html=True)
+    if not model_ready:
+        st.warning("Prediksi belum bisa dijalankan karena satu atau lebih file model/encoder tidak terbaca. Ringkasan dan eksplorasi dataset tetap bisa digunakan.")
+        with st.expander("Periksa lokasi file"):
+            for message in models.get("errors", {}).values():
+                st.write(f"- {message}")
+            st.write("Pastikan file berada di folder yang sama dengan `app.py` pada repository Streamlit Cloud.")
+    else:
+        form_col, result_col = st.columns([1.05, .95], gap="large")
+        with form_col:
+            with st.container(border=True):
+                st.markdown('<div class="panel-title">Parameter distribusi</div>', unsafe_allow_html=True)
+                st.markdown('<div class="panel-hint">Isi kebutuhan dan alokasi untuk satu wilayah.</div>', unsafe_allow_html=True)
+                with st.form("prediction_form"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        kind = st.selectbox("Jenis pupuk", sorted(list(models["le_pupuk"].classes_)))
+                        district = st.selectbox("Kecamatan", sorted(list(models["le_kec"].classes_)))
+                        year = st.number_input("Tahun", min_value=2017, max_value=2035, value=2025, step=1)
+                    with c2:
+                        month_labels = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
+                        month_name = st.selectbox("Bulan", month_labels, index=5)
+                        rdkk = st.number_input("RDKK (ton)", min_value=0.0, max_value=10000.0, value=500.0, step=10.0)
+                        allocation = st.number_input("Alokasi (ton)", min_value=0.0, max_value=10000.0, value=300.0, step=10.0)
+                    run = st.form_submit_button("Hitung estimasi", use_container_width=True)
+        with result_col:
+            with st.container(border=True):
+                st.markdown('<div class="panel-title">Hasil model</div>', unsafe_allow_html=True)
+                st.markdown('<div class="panel-hint">Prediksi muncul di sini setelah input dihitung.</div>', unsafe_allow_html=True)
+                if run:
+                    month_number = month_labels.index(month_name) + 1
+                    values = {
+                        "Jenis Pupuk Enc": int(models["le_pupuk"].transform([kind])[0]),
+                        "Kecamatan Enc": int(models["le_kec"].transform([district])[0]),
+                        "Bulan": month_number,
+                        "Tahun": int(year),
+                        "RDKK (ton)": rdkk,
+                        "Alokasi (ton)": allocation,
+                    }
+                    try:
+                        features = models["features"]
+                        input_frame = pd.DataFrame([values])[features]
+                        prediction_rf = float(models["rf"].predict(input_frame)[0])
+                        prediction_xgb = float(models["xgb"].predict(input_frame)[0])
+                        average = (prediction_rf + prediction_xgb) / 2
+                        st.markdown(
+                            f'<div class="result-panel"><div class="result-number">{ton(average)} ton</div>'
+                            '<div class="result-caption">Rata-rata dua estimasi model</div></div>',
+                            unsafe_allow_html=True,
+                        )
+                        st.write("")
+                        m1, m2 = st.columns(2)
+                        with m1:
+                            st.metric("Random Forest", f"{ton(prediction_rf)} ton")
+                        with m2:
+                            st.metric("XGBoost", f"{ton(prediction_xgb)} ton")
+                        if allocation > 0:
+                            st.caption(f"Perkiraan serapan dari alokasi: RF {ton(prediction_rf / allocation * 100)}% · XGBoost {ton(prediction_xgb / allocation * 100)}%")
+                    except Exception as exc:
+                        st.error(f"Prediksi gagal: {type(exc).__name__}: {exc}")
+                else:
+                    st.markdown(
+                        '<div class="empty-panel"><strong>Siap menghitung</strong>'
+                        '<span>Masukkan parameter di panel kiri. Estimasi RF dan XGBoost akan ditampilkan berdampingan.</span></div>',
+                        unsafe_allow_html=True,
+                    )
+
+with data_tab:
+    st.markdown('<div class="section-heading"><h3>Dataset sumber</h3><span>Data tampil setelah workbook diunggah</span></div>', unsafe_allow_html=True)
+    if frame is None:
+        st.markdown(
+            '<div class="empty-panel"><strong>Workbook belum dipilih</strong>'
+            '<span>Unggah file Excel dari panel kiri untuk melihat tabel, cakupan tahun, dan kualitas data.</span></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        a, b, c = st.columns(3)
+        a.metric("Baris valid", f"{len(frame):,}")
+        b.metric("Tahun tercakup", f"{frame['Tahun'].min()}–{frame['Tahun'].max()}")
+        c.metric("Kecamatan", frame["Kecamatan"].nunique())
+        st.dataframe(frame, use_container_width=True, hide_index=True)
+        csv_bytes = frame.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("Unduh data bersih (CSV)", csv_bytes, "data_pupuk_bersih.csv", "text/csv")
+
+with model_tab:
+    st.markdown('<div class="section-heading"><h3>Kinerja model</h3><span>Evaluasi dari dataset yang diunggah</span></div>', unsafe_allow_html=True)
+    if not model_ready:
+        st.info("Kinerja tidak ditampilkan sampai model dan encoder berhasil dimuat.")
+    elif frame is None:
+        st.info("Unggah dataset untuk menghitung MAE, RMSE, R², dan feature importance pada data evaluasi.")
+    else:
+        try:
+            evaluated = evaluate_models(frame, models)
+            if evaluated is None:
+                st.info("Dataset perlu memuat setidaknya 5 baris valid agar evaluasi bisa dihitung.")
+            else:
+                rf_metrics, xgb_metrics = evaluated
+                m1, m2 = st.columns(2, gap="large")
+                with m1:
+                    with st.container(border=True):
+                        st.markdown('<div class="panel-title">Random Forest</div>', unsafe_allow_html=True)
+                        st.metric("MAE", f"{ton(rf_metrics['mae'])} ton")
+                        st.metric("RMSE", f"{ton(rf_metrics['rmse'])} ton")
+                        st.metric("R²", f"{rf_metrics['r2']:.4f}")
+                with m2:
+                    with st.container(border=True):
+                        st.markdown('<div class="panel-title">XGBoost</div>', unsafe_allow_html=True)
+                        st.metric("MAE", f"{ton(xgb_metrics['mae'])} ton")
+                        st.metric("RMSE", f"{ton(xgb_metrics['rmse'])} ton")
+                        st.metric("R²", f"{xgb_metrics['r2']:.4f}")
+                st.caption("Evaluasi memakai random split 80/20 (random_state=42) pada dataset yang diunggah.")
+        except Exception as exc:
+            st.warning(f"Evaluasi tidak dapat dihitung: {type(exc).__name__}: {exc}")
+
+        if hasattr(models["rf"], "feature_importances_") and hasattr(models["xgb"], "feature_importances_"):
+            features = models["features"]
+            imp_col1, imp_col2 = st.columns(2, gap="large")
+            for col, key, title, color in (
+                (imp_col1, "rf", "Random Forest", TEAL),
+                (imp_col2, "xgb", "XGBoost", "#91B752"),
+            ):
+                with col:
+                    with st.container(border=True):
+                        st.markdown(f'<div class="panel-title">Fitur berpengaruh · {title}</div>', unsafe_allow_html=True)
+                        importance = pd.Series(models[key].feature_importances_, index=features).sort_values()
+                        fig, ax = plt.subplots(figsize=(6, 3.2))
+                        ax.barh(importance.index, importance.values, color=color, height=.56)
+                        ax.spines[["top", "right", "left", "bottom"]].set_visible(False)
+                        ax.tick_params(axis="both", length=0, pad=7)
+                        ax.grid(axis="x")
+                        ax.set_axisbelow(True)
+                        fig.tight_layout(pad=1.1)
+                        show_chart(fig)
+    if models.get("paths"):
+        with st.expander("Lokasi model yang dimuat"):
+            for key, path in models["paths"].items():
+                st.code(f"{key}: {path}", language=None)
+
+st.write("")
+st.caption("Arus Pupuk · Estimasi berbasis Random Forest dan XGBoost")
