@@ -14,6 +14,8 @@ import streamlit as st
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
+from dashboard_logic import filter_dataset
+
 warnings.filterwarnings("ignore")
 
 st.set_page_config(
@@ -186,9 +188,50 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="tab"]:focus-v
 }
 
 [data-testid="stDataFrame"] {
+  background: var(--surface) !important;
+  color-scheme: light !important;
   border: 1px solid var(--line);
   border-radius: 18px;
   overflow: hidden;
+}
+[data-testid="stDataFrame"] iframe { color-scheme: light !important; }
+[data-testid="stDataFrame"] canvas { background: var(--surface) !important; }
+[data-testid="stDataFrame"] [data-testid="stElementToolbar"] { background:#FFFFFF !important; }
+[data-testid="stDataFrame"] [role="grid"] { background:#FFFFFF !important; }
+[data-testid="stDataFrame"] [role="columnheader"] { background:#EAF0E9 !important; color:#24342E !important; }
+[data-testid="stDataFrame"] [role="gridcell"] { background:#FFFFFF !important; color:#24342E !important; }
+[data-testid="stDataFrame"] [role="row"]:nth-child(even) [role="gridcell"] { background:#F6F9F5 !important; }
+@media (prefers-color-scheme: dark) {
+  [data-testid="stDataFrame"], [data-testid="stDataFrame"] iframe,
+  [data-testid="stDataFrame"] canvas { color-scheme: light !important; background:#FFFFFF !important; }
+}
+[data-testid="stSidebar"] > div { overflow-x:hidden; }
+[data-testid="stMainBlockContainer"] { min-width:0; }
+[data-testid="stHorizontalBlock"] { flex-wrap:wrap; }
+.stTabs [data-baseweb="tab-list"] { max-width:100%; overflow-x:auto; scrollbar-width:thin; }
+@media (max-width: 760px) {
+  .block-container { padding:18px 14px 38px !important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width:calc(50% - 8px) !important; }
+  .page-head { align-items:flex-start; }
+  .model-pill { white-space:normal; }
+  .flow-panel { padding:22px 20px; gap:14px; }
+  .stTabs [data-baseweb="tab-panel"] { padding-top:18px; }
+}
+@media (max-width: 520px) {
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width:100% !important; }
+  .flow-graphic { display:grid; grid-template-columns:minmax(0,1fr); width:100%; gap:6px; padding:8px 0 0; }
+  .flow-node { width:100%; height:auto; min-height:58px; padding:10px 14px; border-radius:16px; flex-direction:row; align-items:center; justify-content:space-between; gap:12px; }
+  .flow-node strong { flex:0 0 auto; font-size:14px; }
+  .flow-node span { margin:0; text-align:right; }
+  .flow-link { width:2px; height:10px; justify-self:center; }
+  .flow-link:after { right:-3px; top:3px; transform:rotate(135deg); }
+  .flow-panel { padding:20px 17px; border-radius:20px; }
+  .page-title { font-size:30px; }
+  .stTabs [data-baseweb="tab"] { min-height:40px; padding:0 12px; font-size:12px; }
+  [data-testid="stMetric"] { padding:14px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
 }
 [data-testid="stAlert"] {
   border-radius: 18px;
@@ -396,12 +439,29 @@ def cached_dataset(file_bytes: bytes) -> pd.DataFrame:
     return clean_dataset(file_bytes)
 
 
+@st.cache_data(show_spinner="Menerapkan filter…")
+def filtered_dataset(
+    frame: pd.DataFrame,
+    districts: tuple[str, ...] = (),
+    products: tuple[str, ...] = (),
+    year_range: tuple[int, int] | None = None,
+    search: str = "",
+) -> pd.DataFrame:
+    return filter_dataset(
+        frame,
+        districts=list(districts),
+        products=list(products),
+        year_range=year_range,
+        search=search,
+    )
+
+
 def ton(value: float | int) -> str:
     return f"{value:,.1f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def show_chart(fig) -> None:
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width="stretch")
     plt.close(fig)
 
 
@@ -540,6 +600,79 @@ if uploaded is not None:
     except Exception as exc:
         st.sidebar.error(f"Dataset tidak terbaca: {exc}")
 
+filtered_frame = None
+if frame is not None and not frame.empty:
+    district_options = sorted(frame["Kecamatan"].dropna().unique().tolist())
+    product_options = sorted(frame["Jenis Pupuk"].dropna().unique().tolist())
+    years = sorted(frame["Tahun"].dropna().astype(int).unique().tolist())
+    year_bounds = (years[0], years[-1])
+    current_districts = st.session_state.get("filter_districts", [])
+    st.session_state["filter_districts"] = [
+        value for value in current_districts if value in district_options
+    ]
+    current_products = st.session_state.get("filter_products", [])
+    st.session_state["filter_products"] = [
+        value for value in current_products if value in product_options
+    ]
+    current_years = st.session_state.get("filter_years", year_bounds)
+    if (
+        not isinstance(current_years, (tuple, list))
+        or len(current_years) != 2
+        or current_years[0] < year_bounds[0]
+        or current_years[1] > year_bounds[1]
+    ):
+        st.session_state["filter_years"] = year_bounds
+    st.session_state.setdefault("filter_search", "")
+
+    def reset_filters(bounds: tuple[int, int]) -> None:
+        st.session_state["filter_districts"] = []
+        st.session_state["filter_products"] = []
+        st.session_state["filter_years"] = bounds
+        st.session_state["filter_search"] = ""
+
+    with st.sidebar:
+        st.divider()
+        st.markdown("**Jelajahi dataset**")
+        selected_districts = st.multiselect(
+            "Kecamatan", district_options, key="filter_districts", placeholder="Semua kecamatan"
+        )
+        selected_products = st.multiselect(
+            "Jenis pupuk", product_options, key="filter_products", placeholder="Semua jenis"
+        )
+        if len(years) > 1:
+            selected_years = st.slider(
+                "Rentang tahun", years[0], years[-1], value=year_bounds, key="filter_years"
+            )
+        else:
+            selected_years = year_bounds
+            st.caption(f"Tahun data: {years[0]}")
+        search_query = st.text_input(
+            "Cari baris", key="filter_search", placeholder="Kecamatan, pupuk, tahun…"
+        )
+        st.button(
+            "Reset semua filter",
+            use_container_width=True,
+            on_click=reset_filters,
+            args=(year_bounds,),
+            disabled=not (
+                selected_districts or selected_products or search_query.strip()
+                or tuple(selected_years) != year_bounds
+            ),
+        )
+
+    filtered_frame = filtered_dataset(
+        frame,
+        districts=tuple(selected_districts),
+        products=tuple(selected_products),
+        year_range=tuple(selected_years),
+        search=search_query,
+    )
+    st.sidebar.caption(
+        f"Tampil {len(filtered_frame):,} dari {len(frame):,} baris"
+    )
+
+view_frame = filtered_frame if filtered_frame is not None else frame
+
 st.markdown(
     f"""
     <header class="page-head">
@@ -556,16 +689,23 @@ make_flow_panel(model_ready)
 
 # Real values appear only when the user supplies the workbook. No placeholder metrics.
 row = st.columns(4)
-if frame is not None and not frame.empty:
-    total_realization = frame["Realisasi (ton)"].sum()
-    total_allocation = frame["Alokasi (ton)"].sum()
+if view_frame is not None and not view_frame.empty:
+    total_realization = view_frame["Realisasi (ton)"].sum()
+    total_allocation = view_frame["Alokasi (ton)"].sum()
     absorption = (total_realization / total_allocation * 100) if total_allocation else np.nan
-    latest_year = int(frame["Tahun"].max())
+    latest_year = int(view_frame["Tahun"].max())
     summary_values = [
-        ("Realisasi tercatat", f"{ton(total_realization)} ton", "total pada dataset"),
-        ("Alokasi tercatat", f"{ton(total_allocation)} ton", "total pada dataset"),
+        ("Realisasi tercatat", f"{ton(total_realization)} ton", "sesuai filter aktif"),
+        ("Alokasi tercatat", f"{ton(total_allocation)} ton", "sesuai filter aktif"),
         ("Serapan", f"{ton(absorption)}%" if np.isfinite(absorption) else "—", "realisasi ÷ alokasi"),
-        ("Wilayah / jenis", f"{frame['Kecamatan'].nunique()} / {frame['Jenis Pupuk'].nunique()}", f"hingga {latest_year}"),
+        ("Wilayah / jenis", f"{view_frame['Kecamatan'].nunique()} / {view_frame['Jenis Pupuk'].nunique()}", f"hingga {latest_year}"),
+    ]
+elif view_frame is not None:
+    summary_values = [
+        ("Realisasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
+        ("Alokasi tercatat", "0,0 ton", "tidak ada baris sesuai filter"),
+        ("Serapan", "—", "tidak ada alokasi untuk dihitung"),
+        ("Wilayah / jenis", "0 / 0", "tidak ada baris sesuai filter"),
     ]
 else:
     summary_values = [
@@ -592,13 +732,13 @@ with overview_tab:
         with st.container(border=True):
             st.markdown('<div class="panel-title">Realisasi tahunan</div>', unsafe_allow_html=True)
             st.markdown('<div class="panel-hint">Total tonase yang tercatat per tahun.</div>', unsafe_allow_html=True)
-            draw_trend(frame)
+            draw_trend(view_frame)
     with right:
         with st.container(border=True):
             st.markdown('<div class="panel-title">Komposisi jenis pupuk</div>', unsafe_allow_html=True)
-            st.markdown('<div class="panel-hint">Perbandingan total realisasi dalam dataset.</div>', unsafe_allow_html=True)
-            draw_product_mix(frame)
-    if frame is None:
+            st.markdown('<div class="panel-hint">Perbandingan realisasi pada data sesuai filter.</div>', unsafe_allow_html=True)
+            draw_product_mix(view_frame)
+    if view_frame is None:
         st.markdown(
             '<div class="status-note">Mulai dengan unggah file <b>Data-pupuk-bersubsidi.xlsx</b> dari panel kiri. '
             'Dashboard mengisi angka dari data nyata; tidak ada metrik contoh.</div>',
@@ -675,20 +815,35 @@ with predict_tab:
 
 with data_tab:
     st.markdown('<div class="section-heading"><h3>Dataset sumber</h3><span>Data tampil setelah workbook diunggah</span></div>', unsafe_allow_html=True)
-    if frame is None:
+    if view_frame is None:
         st.markdown(
             '<div class="empty-panel"><strong>Workbook belum dipilih</strong>'
             '<span>Unggah file Excel dari panel kiri untuk melihat tabel, cakupan tahun, dan kualitas data.</span></div>',
             unsafe_allow_html=True,
         )
+    elif view_frame.empty:
+        st.info("Tidak ada baris yang cocok. Ubah filter atau gunakan Reset semua filter di panel kiri.")
     else:
         a, b, c = st.columns(3)
-        a.metric("Baris valid", f"{len(frame):,}")
-        b.metric("Tahun tercakup", f"{frame['Tahun'].min()}–{frame['Tahun'].max()}")
-        c.metric("Kecamatan", frame["Kecamatan"].nunique())
-        st.dataframe(frame, use_container_width=True, hide_index=True)
-        csv_bytes = frame.to_csv(index=False).encode("utf-8-sig")
-        st.download_button("Unduh data bersih (CSV)", csv_bytes, "data_pupuk_bersih.csv", "text/csv")
+        a.metric("Baris tampil", f"{len(view_frame):,}", help=f"Dari {len(frame) if frame is not None else 0:,} baris valid")
+        b.metric("Tahun tercakup", f"{view_frame['Tahun'].min()}–{view_frame['Tahun'].max()}")
+        c.metric("Kecamatan", view_frame["Kecamatan"].nunique())
+        st.dataframe(
+            view_frame,
+            width="stretch",
+            hide_index=True,
+            height=min(560, max(220, 42 + len(view_frame) * 35)),
+            column_config={
+                "Bulan": st.column_config.NumberColumn("Bulan", format="%d"),
+                "Tahun": st.column_config.NumberColumn("Tahun", format="%d"),
+                "RDKK (ton)": st.column_config.NumberColumn("RDKK (ton)", format="%.1f"),
+                "Alokasi (ton)": st.column_config.NumberColumn("Alokasi (ton)", format="%.1f"),
+                "Realisasi (ton)": st.column_config.NumberColumn("Realisasi (ton)", format="%.1f"),
+            },
+        )
+        csv_bytes = view_frame.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("Unduh hasil filter (CSV)", csv_bytes, "data_pupuk_filter.csv", "text/csv")
+        st.caption("Urutkan tabel dengan klik judul kolom. Filter panel kiri mengubah tabel, ringkasan, dan grafik.")
 
 with model_tab:
     st.markdown('<div class="section-heading"><h3>Kinerja model</h3><span>Evaluasi dari dataset yang diunggah</span></div>', unsafe_allow_html=True)
@@ -698,7 +853,7 @@ with model_tab:
         st.info("Unggah dataset untuk menghitung MAE, RMSE, R², dan feature importance pada data evaluasi.")
     else:
         try:
-            evaluated = evaluate_models(frame, models)
+            evaluated = evaluate_models(view_frame, models)
             if evaluated is None:
                 st.info("Dataset perlu memuat setidaknya 5 baris valid agar evaluasi bisa dihitung.")
             else:
