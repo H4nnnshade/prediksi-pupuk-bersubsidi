@@ -25,18 +25,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Independent visual identity: agricultural field records, not a generic card dashboard.
+# Pinterest-inspired pinboard identity, with warm collage colors and rounded forms.
 DASHBOARD_CSS = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
 st.markdown(f"<style>{DASHBOARD_CSS}</style>", unsafe_allow_html=True)
 
-# Carbon-inspired chart palette keeps data series distinct and accessible.
-INK = "#161616"
-TEAL = "#0F62FE"
-CITRON = "#78A9FF"
-AMBER = "#525252"
-MUTED = "#6F6F6F"
-LINE = "#C6C6C6"
-SURFACE = "#FFFFFF"
+# Pinterest-inspired warm palette carries through all charts.
+INK = "#302731"
+TEAL = "#E60023"
+CITRON = "#DDE4CE"
+AMBER = "#F2B95F"
+MUTED = "#746B73"
+LINE = "#E8E0DA"
+SURFACE = "#FFFDF8"
 
 plt.rcParams.update({
     "figure.facecolor": SURFACE,
@@ -248,7 +248,7 @@ def draw_product_mix(frame: pd.DataFrame) -> None:
         return
     grouped = frame.groupby("Jenis Pupuk")["Realisasi (ton)"].sum().sort_values()
     fig, ax = plt.subplots(figsize=(6, 3.3))
-    colors = [TEAL if i == len(grouped) - 1 else "#AFC9BF" for i in range(len(grouped))]
+    colors = [TEAL if i == len(grouped) - 1 else CITRON for i in range(len(grouped))]
     ax.barh(grouped.index, grouped.values, color=colors, height=.56)
     ax.spines[["top", "right", "left", "bottom"]].set_visible(False)
     ax.tick_params(axis="both", length=0, pad=8)
@@ -593,7 +593,7 @@ with model_tab:
             imp_col1, imp_col2 = st.columns(2, gap="large")
             for col, key, title, color in (
                 (imp_col1, "rf", "Random Forest", TEAL),
-                (imp_col2, "xgb", "XGBoost", "#91B752"),
+                (imp_col2, "xgb", "XGBoost", CITRON),
             ):
                 with col:
                     with st.container(border=True):
