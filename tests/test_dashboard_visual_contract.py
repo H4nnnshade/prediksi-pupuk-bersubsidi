@@ -4,32 +4,35 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = ROOT / "app.py"
 CSS_PATH = ROOT / "dashboard.css"
+CONFIG_PATH = ROOT / ".streamlit" / "config.toml"
 
 
 def dashboard_css() -> str:
     return CSS_PATH.read_text(encoding="utf-8")
 
 
-def test_dashboard_adopts_carbon_inspired_blue_gray_design_tokens():
+def test_dashboard_uses_pinterest_inspired_warm_palette():
+    css = dashboard_css().replace(" ", "").lower()
+    config = CONFIG_PATH.read_text(encoding="utf-8").lower()
+
+    assert "--pin-red:#e60023" in css
+    assert "--pin-plum:#211922" in css
+    assert "--pin-sand:#e5e5e0" in css
+    assert "--pin-olive:#62625b" in css
+    assert 'primarycolor = "#e60023"' in config.replace("\n", " ")
+    assert "#0f62fe" not in css
+    assert "--cds-" not in css
+
+
+def test_dashboard_replaces_rectangular_controls_with_rounded_pin_shapes():
     css = dashboard_css().replace(" ", "").lower()
 
-    assert "--cds-interactive:#0f62fe" in css
-    assert "--cds-text:#161616" in css
-    assert "--cds-layer:#f4f4f4" in css
-    assert "--cds-border:#c6c6c6" in css
-    assert "#216c5e" not in css
-    assert "#c7d86b" not in css
-
-
-def test_components_use_carbon_geometry_and_flat_layers():
-    css = dashboard_css().replace(" ", "").lower()
-
-    assert "border-radius:0" in css
-    assert "box-shadow:none" in css
-    assert "font-family:'ibmplexsans'" in css
-    assert "font-family:'ibmplexmono'" in css
-    assert "#0f62fe" in css
-    assert "border-bottom:2pxsolidvar(--cds-interactive)" in css
+    assert "font-family:'dmsans'" in css
+    assert "border-radius:14px" in css
+    assert "border-radius:24px" in css
+    assert ".st-key-summary_metrics[data-testid=\"stcolumn\"]:nth-child(2)[data-testid=\"stmetric\"]" in css
+    assert "#e60023" in css
+    assert "--cds-interactive" not in css
 
 
 def test_dashboard_keeps_report_content_responsive_and_accessible():
@@ -37,7 +40,7 @@ def test_dashboard_keeps_report_content_responsive_and_accessible():
     css = dashboard_css().replace(" ", "").lower()
 
     assert "make_report_header(model_ready, view_frame)" in source
-    assert ".report-heading" in css
+    assert ".report-header" in css
     assert "grid-template-columns:repeat(4,minmax(0,1fr))" in css
     assert "@media(max-width:900px)" in css
     assert "@media(max-width:720px)" in css
