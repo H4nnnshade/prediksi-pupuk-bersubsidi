@@ -29,13 +29,13 @@ st.set_page_config(
 DASHBOARD_CSS = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
 st.markdown(f"<style>{DASHBOARD_CSS}</style>", unsafe_allow_html=True)
 
-# Chart colors share the field-station system and preserve series contrast.
-INK = "#18332E"
-TEAL = "#216C5E"
-CITRON = "#C7D86B"
-AMBER = "#B75F49"
-MUTED = "#70827A"
-LINE = "#D3E0DA"
+# Carbon-inspired chart palette keeps data series distinct and accessible.
+INK = "#161616"
+TEAL = "#0F62FE"
+CITRON = "#78A9FF"
+AMBER = "#525252"
+MUTED = "#6F6F6F"
+LINE = "#C6C6C6"
 SURFACE = "#FFFFFF"
 
 plt.rcParams.update({
