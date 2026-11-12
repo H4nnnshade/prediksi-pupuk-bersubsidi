@@ -25,18 +25,19 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Pinterest-inspired pinboard identity, with warm collage colors and rounded forms.
+# Visual reference: Mobbin · Typefully Web Analytics Dashboard
+# https://mobbin.com/explore/screens/07a5f279-ee9e-491d-8840-3f8014ec1e3f
 DASHBOARD_CSS = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
 st.markdown(f"<style>{DASHBOARD_CSS}</style>", unsafe_allow_html=True)
 
-# Pinterest-inspired warm palette carries through all charts.
-INK = "#302731"
-TEAL = "#E60023"
-CITRON = "#DDE4CE"
-AMBER = "#F2B95F"
-MUTED = "#746B73"
-LINE = "#E8E0DA"
-SURFACE = "#FFFDF8"
+# Mobbin reference palette translated into an agricultural reporting context.
+INK = "#1F2937"
+TEAL = "#5578F6"
+CITRON = "#9AB7A6"
+AMBER = "#D69A48"
+MUTED = "#7B8492"
+LINE = "#E5E9F0"
+SURFACE = "#FFFFFF"
 
 plt.rcParams.update({
     "figure.facecolor": SURFACE,
@@ -177,6 +178,42 @@ def show_chart(fig) -> None:
     plt.close(fig)
 
 
+# Reference hierarchy: tweets/impressions/profile clicks/followers KPIs,
+# sparklines, and cumulative/daily trend chart adapted to real fertilizer metrics.
+def metric_sparkline(frame: pd.DataFrame | None, metric: str) -> str:
+    """Map Typefully's KPI sparklines to actual agricultural data; never synthesize samples."""
+    if frame is None or frame.empty:
+        return '<span class="mobbin-spark mobbin-spark-empty" aria-hidden="true"></span>'
+    by_year = frame.groupby("Tahun")
+    if metric == "Realisasi":
+        values = by_year["Realisasi (ton)"].sum()
+    elif metric == "Alokasi":
+        values = by_year["Alokasi (ton)"].sum()
+    elif metric == "Serapan":
+        values = (by_year["Realisasi (ton)"].sum() / by_year["Alokasi (ton)"].sum().replace(0, np.nan) * 100).dropna()
+    else:
+        values = by_year["Kecamatan"].nunique() + by_year["Jenis Pupuk"].nunique()
+    series = pd.to_numeric(values, errors="coerce").dropna().tolist()
+    if not series:
+        return '<span class="mobbin-spark mobbin-spark-empty" aria-hidden="true"></span>'
+    width, height, pad = 88, 22, 3
+    low, high = min(series), max(series)
+    spread = high - low or 1
+    points = []
+    for index, value in enumerate(series):
+        x = pad + (width - 2 * pad) * index / max(1, len(series) - 1)
+        y = height - pad - (height - 2 * pad) * (value - low) / spread
+        points.append(f"{x:.1f},{y:.1f}")
+    color = "#5578F6" if metric == "Realisasi" else "#8C9AAE" if metric == "Alokasi" else "#5B9674" if metric == "Serapan" else "#D69A48"
+    end_x, end_y = points[-1].split(",")
+    return (
+        f'<svg class="mobbin-spark" viewBox="0 0 {width} {height}" aria-hidden="true" focusable="false">'
+        f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="2" '
+        'stroke-linecap="round" stroke-linejoin="round"/>'
+        f'<circle cx="{end_x}" cy="{end_y}" r="2.2" fill="{color}"/></svg>'
+    )
+
+
 def make_report_header(model_ready: bool, frame: pd.DataFrame | None) -> None:
     if model_ready:
         readiness = "Model prediksi siap"
@@ -225,15 +262,16 @@ def draw_trend(frame: pd.DataFrame) -> None:
         return
     yearly = frame.groupby("Tahun", as_index=False)["Realisasi (ton)"].sum().sort_values("Tahun")
     fig, ax = plt.subplots(figsize=(9, 3.3))
-    ax.plot(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, linewidth=2.8, marker="o", markersize=6)
-    ax.fill_between(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, alpha=.10)
-    ax.grid(axis="y")
+    ax.plot(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, linewidth=2.5, marker="o", markersize=5)
+    ax.fill_between(yearly["Tahun"], yearly["Realisasi (ton)"], color=TEAL, alpha=.09)
+    ax.grid(axis="y", color=LINE, linewidth=.8, alpha=.7)
     ax.spines[["top", "right", "left"]].set_visible(False)
     ax.spines["bottom"].set_color(LINE)
-    ax.tick_params(axis="both", length=0, pad=8)
-    ax.set_ylabel("Realisasi (ton)")
+    ax.tick_params(axis="both", length=0, pad=8, labelsize=9)
+    ax.set_ylabel("Realisasi (ton)", fontsize=9, labelpad=10)
     ax.set_xlabel("")
     ax.margins(x=.04)
+    ax.set_axisbelow(True)
     fig.tight_layout(pad=1.3)
     show_chart(fig)
 
@@ -427,9 +465,22 @@ with st.container(key="summary_metrics"):
             ("Serapan", "—", "realisasi dibanding alokasi"),
             ("Wilayah / jenis", "—", "dihitung dari dataset"),
         ]
-    for cell, (label, value, note) in zip(row, summary_values):
+    spark_metrics = ("Realisasi", "Alokasi", "Serapan", "Wilayah")
+    for cell, (label, value, note), metric_name in zip(row, summary_values, spark_metrics):
         with cell:
             st.metric(label, value, help=note)
+            st.markdown(
+                f'<div class="mobbin-kpi-foot">{metric_sparkline(view_frame, metric_name)}'
+                f'<span>{note}</span></div>',
+                unsafe_allow_html=True,
+            )
+
+st.markdown(
+    '<div class="mobbin-reference-note"><span class="mobbin-live-dot"></span>'
+    '<span>Ringkasan analitik</span><span class="mobbin-note-separator">·</span>'
+    '<span>Nilai, tren mini, dan grafik memakai data workbook aktif</span></div>',
+    unsafe_allow_html=True,
+)
 
 st.write("")
 overview_tab, predict_tab, data_tab, model_tab = st.tabs(["Ringkasan", "Prediksi", "Dataset", "Model"])
@@ -437,20 +488,20 @@ overview_tab, predict_tab, data_tab, model_tab = st.tabs(["Ringkasan", "Prediksi
 with overview_tab:
     st.markdown(
         '<div class="section-heading"><h3>Jejak realisasi</h3>'
-        '<span>Jumlah per tahun</span></div>',
+        '<span>Total realisasi tahunan · sesuai filter aktif</span></div>',
         unsafe_allow_html=True,
     )
-    left, right = st.columns([1.35, .9], gap="large")
-    with left:
-        with st.container(border=True):
-            st.markdown('<div class="panel-title">Realisasi tahunan</div>', unsafe_allow_html=True)
-            st.markdown('<div class="panel-hint">Total tonase yang tercatat per tahun.</div>', unsafe_allow_html=True)
-            draw_trend(view_frame)
-    with right:
-        with st.container(border=True):
-            st.markdown('<div class="panel-title">Komposisi jenis pupuk</div>', unsafe_allow_html=True)
-            st.markdown('<div class="panel-hint">Perbandingan realisasi pada data sesuai filter.</div>', unsafe_allow_html=True)
-            draw_product_mix(view_frame)
+    with st.container(border=True):
+        st.markdown('<div class="mobbin-chart-heading"><div><div class="panel-title">Realisasi pupuk</div>'
+                    '<div class="panel-hint">Pergerakan jumlah penyaluran menurut tahun.</div></div>'
+                    '<div class="mobbin-chart-legend"><span></span>Realisasi</div></div>', unsafe_allow_html=True)
+        draw_trend(view_frame)
+    st.markdown('<div class="section-heading mobbin-secondary-heading"><h3>Komposisi distribusi</h3>'
+                '<span>Per jenis pupuk</span></div>', unsafe_allow_html=True)
+    with st.container(border=True):
+        st.markdown('<div class="panel-title">Realisasi per jenis pupuk</div>'
+                    '<div class="panel-hint">Perbandingan tonase untuk baris yang cocok dengan filter aktif.</div>', unsafe_allow_html=True)
+        draw_product_mix(view_frame)
     if view_frame is None:
         st.markdown(
             '<div class="status-note">Mulai dengan unggah file <b>Data-pupuk-bersubsidi.xlsx</b> dari panel kiri. '
