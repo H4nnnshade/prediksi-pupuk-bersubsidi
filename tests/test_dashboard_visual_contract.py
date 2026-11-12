@@ -58,6 +58,20 @@ def test_dashboard_keeps_responsive_accessible_mobbin_layout():
     assert "#0f62fe" not in css
 
 
+def test_sidebar_dataset_panel_can_collapse_and_reopen():
+    css = dashboard_css().replace(" ", "").lower()
+
+    header_rules = css.split('[data-testid="stheader"]',1)[1].split('h1,h2,h3,h4',1)[0]
+    assert '[data-testid="sttoolbar"]{visibility:visible!important' in header_rules
+    assert '[data-testid="stexpandsidebarbutton"]' in header_rules
+    assert '[data-testid="stsidebarcollapsebutton"]' in css
+    assert '[data-testid="stexpandsidebarbutton"]' in css
+    assert "pointer-events:auto!important" in css
+    assert "visibility:visible!important" in css
+    sidebar_rule = css.split('[data-testid="stsidebar"]>div',1)[1].split('}',1)[0]
+    assert "overflow-x:hidden" not in sidebar_rule
+
+
 def test_dashboard_keeps_source_attribution_for_reference():
     source = APP_PATH.read_text(encoding="utf-8")
     assert "Mobbin · Typefully Web Analytics Dashboard" in source
